@@ -104,7 +104,9 @@ jobs:
           - sub_level: "138"
             os_patch_level: "2025-06"
           - sub_level: "145"
-            os_patch_level: "2025-09"
+            os_patch_level: "2026-03"
+          - sub_level: "162"
+            os_patch_level: "lts"
           - sub_level: "X"
             os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
