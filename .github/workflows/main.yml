@@ -10,6 +10,10 @@
 
 name: 构建内核
 
+# 适配 Node.js 24
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # 并发控制：同一分支只运行一个实例，新运行会取消旧的
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,16 +37,7 @@ on:
         default: Actions
 
       # ==================== KernelSU 配置 ====================
-      kernelsu_variant:
-        description: "KernelSU 变体"
-        type: choice
-        options:
-          - SukiSU
-          - ReSukiSU
-          - Official
-          - Next
-          - MKSU
-        default: ReSukiSU
+      # KernelSU 变体固定为 ReSukiSU
       kernelsu_branch:
         description: "KSU 分支 (main/builtin/自定义commit hash，留空使用默认)"
         type: string
@@ -110,12 +105,12 @@ on:
         description: "Commit (sha 或描述)"
         type: string
         default: ""
-        required: true
+        required: false
       change_log:
         description: "Change Log (可选，支持多行)"
         type: string
         default: ""
-        required: true
+        required: false
 
 jobs:
   # ==================== 获取管理器 ====================
@@ -123,8 +118,6 @@ jobs:
   get-manager:
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
-    with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
 
   # ==================== Android 12 - 5.10 构建 ====================
   build-a12-5-10:
@@ -132,7 +125,6 @@ jobs:
     uses: ./.github/workflows/kernel-a12-5-10.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
@@ -148,7 +140,6 @@ jobs:
     uses: ./.github/workflows/kernel-a13-5-15.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
@@ -164,7 +155,6 @@ jobs:
     uses: ./.github/workflows/kernel-a14-6-1.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
@@ -180,7 +170,6 @@ jobs:
     uses: ./.github/workflows/kernel-a15-6-6.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
@@ -196,7 +185,6 @@ jobs:
     uses: ./.github/workflows/kernel-a16-6-12.yml
     secrets: inherit
     with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
       kernelsu_branch: ${{ inputs.kernelsu_branch }}
       version: ${{ inputs.version }}
       build_time: ${{ inputs.build_time || '' }}
@@ -273,13 +261,7 @@ jobs:
       # 预计算各种显示名称，简化后续引用
       - name: 设置显示名称
         run: |
-          case "${{ inputs.kernelsu_variant }}" in
-            "Next")      KSU_NAME="KernelSU-Next" ;;
-            "Official")  KSU_NAME="KernelSU" ;;
-            "MKSU")      KSU_NAME="MKSU" ;;
-            "SukiSU")    KSU_NAME="SukiSU" ;;
-            "ReSukiSU")  KSU_NAME="ReSukiSU" ;;
-          esac
+          KSU_NAME="ReSukiSU"
           echo "KSU_NAME=$KSU_NAME" >> $GITHUB_ENV
 
           KSU_VER="${{ needs.get-manager.outputs.ksuVer }}"
@@ -292,19 +274,9 @@ jobs:
           echo "KPM_LINE=${{ inputs.use_kpm && '-> KPM 支持' || '' }}" >> $GITHUB_ENV
           echo "LZ4_SUFFIX=${{ inputs.use_zram && '、LZ4KD' || '' }}" >> $GITHUB_ENV
 
-          if [ "${{ inputs.kernelsu_variant }}" = "SukiSU" ] || [ "${{ inputs.kernelsu_variant }}" = "ReSukiSU" ]; then
-            echo "HOOK_TYPE=-> SUSFS Inline Hooks" >> $GITHUB_ENV
-          else
-            echo "HOOK_TYPE=-> KPROBE Hooks" >> $GITHUB_ENV
-          fi
-
-          if [ "${{ inputs.kernelsu_variant }}" = "Official" ]; then
-            echo "MOUNT_TYPE=-> OVERLAYFS 支持" >> $GITHUB_ENV
-            echo "KSU_SUFFIX=原版" >> $GITHUB_ENV
-          else
-            echo "MOUNT_TYPE=-> Magic Mount 支持" >> $GITHUB_ENV
-            echo "KSU_SUFFIX=" >> $GITHUB_ENV
-          fi
+          echo "HOOK_TYPE=-> SUSFS Inline Hooks" >> $GITHUB_ENV
+          echo "MOUNT_TYPE=-> Magic Mount 支持" >> $GITHUB_ENV
+          echo "KSU_SUFFIX=" >> $GITHUB_ENV
 
           if [ -n "${{ inputs.kernelsu_branch }}" ]; then
             echo "BRANCH_INFO=(${{ inputs.kernelsu_branch }})" >> $GITHUB_ENV
@@ -335,30 +307,15 @@ jobs:
         uses: actions/checkout@v6
 
       - name: 确定 KSU 分支
-        if: inputs.kernelsu_branch != '' || inputs.kernelsu_variant == 'MKSU' || inputs.kernelsu_variant == 'SukiSU' || inputs.kernelsu_variant == 'ReSukiSU'
+        if: inputs.kernelsu_branch != ''
         run: |
-          # 如果用户输入了自定义分支/commit，使用用户输入的
-          if [ -n "${{ inputs.kernelsu_branch }}" ]; then
-            BRANCH="${{ inputs.kernelsu_branch }}"
-          else
-            case "${{ inputs.kernelsu_variant }}" in
-              "Official"|"MKSU") BRANCH="main" ;;
-              "SukiSU"|"ReSukiSU") BRANCH="main" ;;
-              "Next") BRANCH="dev" ;;
-              *) echo "错误: 未知变体" >&2; exit 1 ;;
-            esac
-          fi
+          BRANCH="${{ inputs.kernelsu_branch }}"
           echo "KSU_BRANCH=$BRANCH" >> $GITHUB_ENV
 
       - name: 获取 KernelSU 提交信息
         run: |
-          case "${{ inputs.kernelsu_variant }}" in
-            "Official") REPO_URL="https://github.com/tiann/KernelSU.git"; REPO_URL2="tiann/KernelSU" ;;
-            "Next") REPO_URL="https://github.com/KernelSU-Next/KernelSU-Next.git"; REPO_URL2="KernelSU-Next/KernelSU-Next" ;;
-            "MKSU") REPO_URL="https://github.com/5ec1cff/KernelSU.git"; REPO_URL2="5ec1cff/KernelSU" ;;
-            "SukiSU") REPO_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"; REPO_URL2="SukiSU-Ultra/SukiSU-Ultra" ;;
-            "ReSukiSU") REPO_URL="https://github.com/ReSukiSU/ReSukiSU.git"; REPO_URL2="ReSukiSU/ReSukiSU" ;;
-          esac
+          REPO_URL="https://github.com/ReSukiSU/ReSukiSU.git"
+          REPO_URL2="ReSukiSU/ReSukiSU"
 
           # 如果用户输入了自定义分支/commit，优先使用
           if [ -n "${{ inputs.kernelsu_branch }}" ]; then
@@ -373,16 +330,11 @@ jobs:
               KSU_REF=$COMMIT_HASH
               KSU_URL="https://github.com/$REPO_URL2/commit/$COMMIT_HASH"
             fi
-          elif [[ "${{ inputs.kernelsu_variant }}" != "MKSU" ]]; then
+          else
             # 稳定版：获取最新 tag
             TAG=$(git ls-remote --tags --sort=-v:refname $REPO_URL | grep -o 'refs/tags/.*' | cut -d'/' -f3 | head -n1)
             KSU_REF=$TAG
             KSU_URL="https://github.com/$REPO_URL2/releases/tag/$TAG"
-          else
-            # MKSU 或其他情况：获取分支最新 commit
-            COMMIT_HASH=$(git ls-remote $REPO_URL refs/heads/${KSU_BRANCH:-main} | awk '{ print $1 }')
-            KSU_REF=$COMMIT_HASH
-            KSU_URL="https://github.com/$REPO_URL2/commit/$COMMIT_HASH"
           fi
 
           echo "KSU_REF=$KSU_REF" >> $GITHUB_ENV
@@ -487,7 +439,7 @@ jobs:
           <details>
           <summary>🔗 提交信息 / Commit Info</summary>
 
-          **KernelSU (${{ inputs.kernelsu_variant }})**: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
+          **KernelSU (ReSukiSU)**: [${{ env.KSU_REF }}](${{ env.KSU_URL }})
 
           **SUSFS4KSU**:
           - gki-android12-5.10: [${{ env.COMMIT_HASH_gki_android12_5_10 }}](${{ env.COMMIT_URL_gki_android12_5_10 }})
@@ -590,12 +542,12 @@ jobs:
           TEXT=$(cat <<EOF
           <b>New GKI Release:</b>
           
-          Branch: <code>main</code>
+          Branch: <code>${{ github.ref_name }}</code>
           Commit: ${INPUT_COMMIT}
           Tag: <code>${NEW_TAG}</code>
           
           Features: 
-          <pre>ReSukiSU = ${{ inputs.kernelsu_variant == 'ReSukiSU' && 'true' || 'false' }}
+          <pre>ReSukiSU = true
           SuSFS = ${{ inputs.cancel_susfs && 'false' || 'true' }}
           BBG = ${{ inputs.use_bbg && 'true' || 'false' }}
           LZ4KD = ${{ inputs.use_zram && 'true' || 'false' }}
@@ -630,7 +582,7 @@ jobs:
           TEXT=$(cat <<EOF
           <b>New GKI Release:</b>
           
-          Branch: <code>main</code>
+          Branch: <code>${{ github.ref_name }}</code>
           Commit: ${INPUT_COMMIT}
           Tag: <code>${NEW_TAG}</code>
           
@@ -671,7 +623,7 @@ jobs:
           TEXT=$(cat <<EOF
           <b>New GKI Release:</b>
           
-          Branch: <code>main</code>
+          Branch: <code>${{ github.ref_name }}</code>
           Commit: ${INPUT_COMMIT}
           Tag: <code>${NEW_TAG}</code>
           

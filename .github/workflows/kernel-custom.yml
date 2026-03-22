@@ -1,5 +1,9 @@
 name: Android 内核构建-自定义
 
+# 适配 Node.js 24
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: write
   actions: write
@@ -47,17 +51,7 @@ on:
         default: "r11"
 
       # ==================== KernelSU 配置 ====================
-      kernelsu_variant:
-        description: "KernelSU 变体"
-        required: true
-        type: choice
-        options:
-          - Official
-          - Next
-          - MKSU
-          - SukiSU
-          - ReSukiSU
-        default: ReSukiSU
+      # KernelSU 变体固定为 ReSukiSU
       kernelsu_branch:
         description: "KSU 分支 (main/builtin/自定义commit hash，留空使用默认)"
         required: false
@@ -113,7 +107,7 @@ jobs:
       sub_level: ${{ inputs.sub_level }}
       os_patch_level: ${{ inputs.os_patch_level }}
       revision: ${{ inputs.revision || '' }}
-      ksu_variant: ${{ inputs.kernelsu_variant }}
+      ksu_variant: "ReSukiSU"
       ksu_branch: ${{ inputs.kernelsu_branch }}
       version: ${{ inputs.version || '' }}
       build_time: ${{ inputs.build_time || '' }}
@@ -126,5 +120,3 @@ jobs:
   get-ksu-manager:
     uses: ./.github/workflows/get-manager.yml
     secrets: inherit
-    with:
-      kernelsu_variant: ${{ inputs.kernelsu_variant }}
