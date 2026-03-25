@@ -96,9 +96,9 @@ on:
         type: boolean
         default: false
       build_all:
-        description: "构建全部版本"
+        description: "All"
         type: boolean
-        default: true
+        default: false
 
       # ==================== Bot-Push 选项 ====================
       commit:
