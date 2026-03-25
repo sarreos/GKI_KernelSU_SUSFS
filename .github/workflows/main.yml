@@ -8,7 +8,7 @@
 # 4. 创建 GitHub Release (可选)
 # ========================================
 
-name: 构建内核
+name: Build
 
 # 适配 Node.js 24
 env:
