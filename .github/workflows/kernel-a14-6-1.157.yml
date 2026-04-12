@@ -41,6 +41,11 @@ on:
         required: true
         type: boolean
         default: false
+      use_rekernel:
+        description: "启用 Re-Kernel 驱动"
+        required: false
+        type: boolean
+        default: false
       cancel_susfs:
         description: "禁用 SUSFS"
         required: true
@@ -68,6 +73,10 @@ on:
       use_kpm:
         required: true
         type: boolean
+      use_rekernel:
+        required: false
+        type: boolean
+        default: false
       cancel_susfs:
         required: false
         type: boolean
@@ -86,6 +95,8 @@ jobs:
         include:
           - sub_level: "157"
             os_patch_level: "2025-12"
+          - sub_level: "X"
+            os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
@@ -100,6 +111,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_bbg: ${{ inputs.use_bbg }}
       use_kpm: ${{ inputs.use_kpm }}
+      use_rekernel: ${{ inputs.use_rekernel || false }}
       supp_op: false
       enable_susfs: ${{ !inputs.cancel_susfs }}
 
