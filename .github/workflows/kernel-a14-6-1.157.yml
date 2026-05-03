@@ -1,4 +1,4 @@
-name: Android 14 (6.1.157/lts)
+name: Android 14 (6.1.157/162)
 
 # 适配 Node.js 24
 env:
@@ -95,8 +95,8 @@ jobs:
         include:
           - sub_level: "157"
             os_patch_level: "2025-12"
-          - sub_level: "X"
-            os_patch_level: "lts"
+          - sub_level: "162"
+            os_patch_level: "2026-03"
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
