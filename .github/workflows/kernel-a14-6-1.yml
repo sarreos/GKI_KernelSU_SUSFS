@@ -1,6 +1,6 @@
-name: 内核构建 - Android 14 (6.1)
+name: Android 14 (6.1.162)
 
-# 适配 Node.js 24
+# Node.js 24
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -11,43 +11,48 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      # KernelSU 变体固定为 ReSukiSU
+      # KernelSU ReSukiSU
       kernelsu_branch:
-        description: "KSU 分支 (main/builtin/自定义commit hash，留空使用默认)"
+        description: "KSU (main/dev/commit hash)"
         required: false
         type: string
         default: ""
       version:
-        description: "自定义版本名 (可选)"
+        description: "Custom version name"
         required: false
         type: string
       build_time:
-        description: "自定义构建时间 (可选，N或留空=当前UTC)"
+        description: "Custom Build Time (blank = current UTC time)"
         required: false
         type: string
         default: "Sun Mar 22 08:10:00 UTC 2026"
       use_zram:
-        description: "启用 ZRAM 增强算法"
+        description: "Enable ZRAM"
         required: true
         type: boolean
         default: false
       use_bbg:
-        description: "启用 BBG 防格机"
+        description: "Enable BBG"
         required: true
         type: boolean
         default: false
       use_rekernel:
-        description: "启用 Re-Kernel 驱动"
+        description: "Enable Re-Kernel"
         required: false
         type: boolean
         default: false
-      cancel_susfs:
-        description: "禁用 SUSFS"
+      enable_susfs:
+        description: "Enable SUSFS"
+        required: true
+        type: boolean
+        default: false
+      enable_nomount:
+        description: "Enable NoMount"
         required: true
         type: boolean
         default: false
       droidspaces:
-        description: "Droidspaces 容器支持"
+        description: "Enable Droidspaces"
         required: false
         type: choice
         options:
@@ -57,13 +62,13 @@ on:
           - "345"
         default: "off"
       droidspaces_ntsync:
-        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+        description: "Enable NTSync"
         required: false
         type: boolean
         default: false
   workflow_call:
     inputs:
-      # KernelSU 变体固定为 ReSukiSU
+      # KernelSU ReSukiSU
       kernelsu_branch:
         required: true
         type: string
@@ -73,7 +78,7 @@ on:
       build_time:
         required: false
         type: string
-        default: "Sun Dec 01 08:10:00 UTC 2024"
+        default: "Sun Mar 22 08:10:00 UTC 2026"
       use_zram:
         required: true
         type: boolean
@@ -84,7 +89,10 @@ on:
         required: false
         type: boolean
         default: false
-      cancel_susfs:
+      enable_susfs:
+        required: false
+        type: boolean
+      enable_nomount:
         required: false
         type: boolean
       droidspaces:
@@ -96,7 +104,7 @@ on:
         type: boolean
         default: false
       called_from_main:
-        description: "是否从 main.yml 调用（内部使用）"
+        description: "main.yml"
         required: false
         type: boolean
         default: false
@@ -125,11 +133,12 @@ jobs:
       use_bbg: ${{ inputs.use_bbg }}
       use_rekernel: ${{ inputs.use_rekernel || false }}
       supp_op: false
-      enable_susfs: ${{ !inputs.cancel_susfs }}
+      enable_susfs: ${{ inputs.enable_susfs || false }}
+      enable_nomount: ${{ inputs.enable_nomount  || false}}
       droidspaces: ${{ inputs.droidspaces || 'off' }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync || false }}
 
-  # 仅在直接触发时运行，从 main.yml 调用时跳过
+  # main.yml
   get-ksu-manager:
     if: ${{ !inputs.called_from_main }}
     uses: ./.github/workflows/get-manager.yml
