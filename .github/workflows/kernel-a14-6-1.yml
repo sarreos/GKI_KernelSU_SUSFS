@@ -16,7 +16,7 @@ on:
         description: "KSU (main/dev/commit hash)"
         required: false
         type: string
-        default: ""
+        default: "main"
       version:
         description: "Custom version name"
         required: false
@@ -35,7 +35,7 @@ on:
         description: "Enable BBG"
         required: true
         type: boolean
-        default: false
+        default: true
       use_rekernel:
         description: "Enable Re-Kernel"
         required: false
@@ -50,7 +50,7 @@ on:
         description: "Enable NoMount"
         required: true
         type: boolean
-        default: false
+        default: true
       droidspaces:
         description: "Enable Droidspaces"
         required: false
