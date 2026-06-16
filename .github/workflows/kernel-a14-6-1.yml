@@ -1,4 +1,4 @@
-name: Android 14 (6.1.162)
+name: Android 14 (6.1.162/lts)
 
 # Node.js 24
 env:
