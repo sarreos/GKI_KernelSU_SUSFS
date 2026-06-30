@@ -24,7 +24,7 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        git clone --depth=1 https://github.com/maxsteeel/nomount.git -n dev
+        git clone --depth=1 https://github.com/maxsteeel/nomount.git -b dev
     - name: Integrate NoMount in kernel
       shell: bash
       working-directory: ${{ env.KERNEL_ROOT }}/common
