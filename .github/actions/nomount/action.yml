@@ -1,0 +1,40 @@
+name: Setup NoMount
+description: Clone and apply NoMount patches
+inputs:
+  version:
+    description: 'Kernel config version (e.g., android15-6.6)'
+    required: false
+  android_version:
+    description: 'Android version (e.g., android15)'
+    required: false
+  kernel_version:
+    description: 'Kernel version (e.g., 6.6)'
+    required: true
+  os_patch_level:
+    description: 'OS patch level (e.g., 2024-07)'
+    required: false
+  sublevel:
+    description: 'Kernel sublevel'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Download and Apply NoMount Patches
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        git clone --depth=1 https://github.com/maxsteeel/nomount.git
+
+    - name: Integrate NoMount in kernel
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      run: |
+        cp ${{ github.workspace }}/nomount/kernel/src/* ./fs/
+        patch -p1 < ${{ github.workspace }}/nomount/kernel/patches/nomount_${{ inputs.kernel_version }}_kernel_integration.patch
+
+    - name: Enable Config
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        echo "CONFIG_NOMOUNT=y" >> ${{ github.workspace }}/wild_gki.fragment

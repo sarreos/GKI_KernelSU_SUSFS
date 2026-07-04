@@ -32,14 +32,18 @@ on:
         description: "Feature Set"
         type: choice
         options:
+          - KSUN+SUSFS+BBG+NET+DS+NM
           - KSUN+SUSFS+BBG+NET+DS
+          - KSUN+SUSFS+BBG+NM
           - KSUN+SUSFS+BBG
           - KSUN+SUSFS+NET
           - KSUN+SUSFS+DS
+          - KSUN+SUSFS+NM
           - KSUN+SUSFS
           - KSUN+BBG
           - KSUN+NET
           - KSUN+DS
+          - KSUN+NM
           - KSUN
           - NONE
           - FULL
