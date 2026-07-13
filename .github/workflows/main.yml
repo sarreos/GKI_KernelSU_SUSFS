@@ -446,7 +446,7 @@ jobs:
         testing: false
 
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
 
     - name: Generate New Tag
       id: tag

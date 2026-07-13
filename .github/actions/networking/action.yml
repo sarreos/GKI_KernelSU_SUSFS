@@ -111,6 +111,9 @@ runs:
           patch -p1 < ${{ github.action_path }}/patches/0001-net-tcp-backport-BBRv3-to-android14-5.15.patch
         elif [[ ${{ inputs.version }} == "android13-5.15" ]]; then
           patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android13-5.15.patch"
+          if [[ ${{ inputs.sublevel }} -le "43" ]]; then
+            patch -p1 < ${{ github.action_path }}/patches/0002-net-tcp-add-tcp_snd_cwnd-and-tcp_snd_cwnd_set-helper-functions.patch
+          fi
         elif [[ ${{ inputs.version }} == "android13-5.10" ]]; then
           patch -p1 < "${{ github.workspace }}/kernel_patches/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android12-5.10.patch"
         elif [[ ${{ inputs.version }} == "android12-5.10" ]]; then

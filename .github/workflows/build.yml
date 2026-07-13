@@ -40,11 +40,11 @@ jobs:
   build-gki:
     name: "${{ inputs.kernel_version }}.${{ inputs.sublevel }}-${{ inputs.android_version }}-${{ inputs.os_patch_level }} (${{ inputs.variant }})"
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
 
     - name: 🧹 Emergency Disk Cleanup
       if: false
@@ -301,7 +301,7 @@ jobs:
           ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
 
     - name: Cache ccache (GitHub Native)
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: /home/runner/.ccache
         key: ccache-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
@@ -311,7 +311,7 @@ jobs:
           ccache-
 
     - name: Cache bazel-cache (GitHub Native)
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: /home/runner/.cache/bazel
         key: bazel-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-${{ inputs.os_patch_level }}
