@@ -33,7 +33,7 @@ on:
         description: "Enable NoMount"
         type: boolean
         required: false
-        default: false
+        default: true
       # Kernel selection defaults to android14-6.1 sublevel 162 (2026-03)
       version:
         description: "version"
