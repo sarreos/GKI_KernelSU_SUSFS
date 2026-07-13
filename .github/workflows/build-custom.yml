@@ -29,6 +29,11 @@ on:
         type: boolean
         required: false
         default: false
+      enable_nomount:
+        description: "Enable NoMount"
+        type: boolean
+        required: false
+        default: false
       # Kernel selection defaults to android14-6.1 sublevel 162 (2026-03)
       version:
         description: "version"
@@ -88,6 +93,7 @@ jobs:
             if [ "${{ github.event.inputs.enable_bbg }}" = "true" ]; then parts+=(BBG); fi
             if [ "${{ github.event.inputs.enable_net }}" = "true" ]; then parts+=(NET); fi
             if [ "${{ github.event.inputs.enable_ds }}" = "true" ]; then parts+=(DS); fi
+            if [ "${{ github.event.inputs.enable_nomount }}" = "true" ]; then parts+=(NM); fi
             if [ ${#parts[@]} -eq 0 ]; then
               fs="NONE"
             else
