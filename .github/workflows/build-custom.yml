@@ -1,0 +1,123 @@
+name: Build specific kernel version (lightweight)
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Optional: prefer a pre-composed feature_set string; if empty the booleans below are used
+      feature_set:
+        description: "Feature set (e.g. KSUN+SUSFS+BBG). Leave empty to use individual toggles."
+        type: string
+        required: false
+        default: ""
+      enable_ksun:
+        description: "Enable KernelSU"
+        type: boolean
+        required: false
+        default: true
+      enable_susfs:
+        description: "Enable SUSFS"
+        type: boolean
+        required: false
+        default: true
+      enable_bbg:
+        description: "Enable BBG"
+        type: boolean
+        required: false
+        default: true
+      enable_net:
+        description: "Enable NET"
+        type: boolean
+        required: false
+        default: true
+      enable_ds:
+        description: "Enable DS"
+        type: boolean
+        required: false
+        default: true
+      # Kernel selection defaults to android14-6.1 sublevel 162 (2026-03)
+      version:
+        description: "Version (human) - used by build.yml"
+        type: string
+        required: false
+        default: "android14-6.1"
+      android_version:
+        description: "android_version (used by build.yml)"
+        type: string
+        required: false
+        default: "android14"
+      kernel_version:
+        description: "kernel_version (used by build.yml)"
+        type: string
+        required: false
+        default: "6.1"
+      sublevel:
+        description: "sublevel (e.g. 162)"
+        type: string
+        required: false
+        default: "162"
+      os_patch_level:
+        description: "os_patch_level / date (e.g. 2026-03)"
+        type: string
+        required: false
+        default: "2026-03"
+      variant:
+        description: "variant (Normal)"
+        type: string
+        required: false
+        default: "Normal"
+      ksu_branch:
+        description: "KernelSU branch or commit (empty = latest dev-susfs branch tip)"
+        type: string
+        required: false
+        default: ""
+      susfs_commit:
+        description: "SUSFS commit for this kernel (empty = latest branch tip)"
+        type: string
+        required: false
+        default: ""
+
+jobs:
+  compute-feature-set:
+    name: Compute feature_set from toggles
+    runs-on: ubuntu-latest
+    outputs:
+      feature_set: ${{ steps.set.outputs.feature_set }}
+    steps:
+      - name: Compute feature_set
+        id: set
+        shell: bash
+        run: |
+          set -euo pipefail
+          # If user provided a feature_set string, use it.
+          if [ -n "${{ github.event.inputs.feature_set }}" ]; then
+            fs="${{ github.event.inputs.feature_set }}"
+          else
+            parts=()
+            if [ "${{ github.event.inputs.enable_ksun }}" = "true" ]; then parts+=(KSUN); fi
+            if [ "${{ github.event.inputs.enable_susfs }}" = "true" ]; then parts+=(SUSFS); fi
+            if [ "${{ github.event.inputs.enable_bbg }}" = "true" ]; then parts+=(BBG); fi
+            if [ "${{ github.event.inputs.enable_net }}" = "true" ]; then parts+=(NET); fi
+            if [ "${{ github.event.inputs.enable_ds }}" = "true" ]; then parts+=(DS); fi
+            if [ ${#parts[@]} -eq 0 ]; then
+              fs="NONE"
+            else
+              fs=$(IFS=+; echo "${parts[*]}")
+            fi
+          fi
+          echo "feature_set=$fs" >> "$GITHUB_OUTPUT"
+
+  build-single:
+    name: Run single build (calls existing build.yml)
+    needs: compute-feature-set
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ github.event.inputs.version }}
+      android_version: ${{ github.event.inputs.android_version }}
+      kernel_version: ${{ github.event.inputs.kernel_version }}
+      sublevel: ${{ github.event.inputs.sublevel }}
+      os_patch_level: ${{ github.event.inputs.os_patch_level }}
+      variant: ${{ github.event.inputs.variant }}
+      feature_set: ${{ needs.compute-feature-set.outputs.feature_set }}
+      ksu_branch: ${{ github.event.inputs.ksu_branch }}
+      susfs_commit: ${{ github.event.inputs.susfs_commit }}
+    secrets: inherit
