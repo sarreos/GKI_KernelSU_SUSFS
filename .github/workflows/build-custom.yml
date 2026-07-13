@@ -1,4 +1,4 @@
-name: Build specific kernel version (lightweight)
+name: build-custom
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
         description: "Enable SUSFS"
         type: boolean
         required: false
-        default: true
+        default: false
       enable_bbg:
         description: "Enable BBG"
         type: boolean
@@ -33,45 +33,40 @@ on:
         description: "Enable DS"
         type: boolean
         required: false
-        default: true
+        default: false
       # Kernel selection defaults to android14-6.1 sublevel 162 (2026-03)
       version:
-        description: "Version (human) - used by build.yml"
+        description: "version"
         type: string
         required: false
         default: "android14-6.1"
       android_version:
-        description: "android_version (used by build.yml)"
+        description: "Android version"
         type: string
         required: false
         default: "android14"
       kernel_version:
-        description: "kernel_version (used by build.yml)"
+        description: "Kernel Version"
         type: string
         required: false
         default: "6.1"
       sublevel:
-        description: "sublevel (e.g. 162)"
+        description: "Sublevel"
         type: string
         required: false
         default: "162"
       os_patch_level:
-        description: "os_patch_level / date (e.g. 2026-03)"
+        description: "OS patch level"
         type: string
         required: false
         default: "2026-03"
-      variant:
-        description: "variant (Normal)"
-        type: string
-        required: false
-        default: "Normal"
       ksu_branch:
-        description: "KernelSU branch or commit (empty = latest dev-susfs branch tip)"
+        description: "KernelSU (empty = main branch)"
         type: string
         required: false
         default: ""
       susfs_commit:
-        description: "SUSFS commit for this kernel (empty = latest branch tip)"
+        description: "SUSFS commit (empty = latest branch)"
         type: string
         required: false
         default: ""
