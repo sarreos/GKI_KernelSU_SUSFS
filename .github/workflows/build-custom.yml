@@ -103,7 +103,7 @@ jobs:
           echo "feature_set=$fs" >> "$GITHUB_OUTPUT"
 
   build-single:
-    name: Run single build (calls existing build.yml)
+    name: Run build
     needs: compute-feature-set
     uses: ./.github/workflows/build.yml
     with:

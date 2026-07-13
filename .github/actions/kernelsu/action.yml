@@ -1,7 +1,7 @@
 name: Setup ReSukiSU
 description: Download and configure ReSukiSU with version tracking
 inputs:
-  resukisu_branch:
+  ksu_branch:
     description: 'ReSukiSU branch or commit (empty = latest main branch tip)'
     required: false
     default: ""
@@ -16,7 +16,7 @@ runs:
         set -euo pipefail
 
         RESUKISU_REPO="https://github.com/ReSukiSU/ReSukiSU.git"
-        RESUKISU_INPUT="${{ inputs.resukisu_branch }}"
+        RESUKISU_INPUT="${{ inputs.ksu_branch }}"
         if [ -z "$RESUKISU_INPUT" ]; then
           RESUKISU_INPUT="main"
         fi
@@ -35,6 +35,9 @@ runs:
         fi
 
         cd KernelSU/kernel
+
+        git add .
+        git commit -m "Apply ReSukiSU kernel integration"
         
         COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
         BASE_VERSION=30000
@@ -61,14 +64,6 @@ runs:
         echo "RESUKISU_GIT_TAG=$RESUKISU_GIT_TAG" >> $GITHUB_ENV
         echo "RESUKISU_VERSION=$RESUKISU_VERSION" >> $GITHUB_ENV
         echo "RESUKISU_COMMIT=$RESUKISU_COMMIT" >> $GITHUB_ENV
-
-    - name: 'Fix ReSukiSU'
-      shell: bash
-      working-directory: ${{ github.workspace }}/kernel/KernelSU
-      run: |
-        set -euo pipefail
-        cp ${{ github.action_path }}/patches/static.patch "${{ github.workspace }}/kernel/KernelSU/static.patch"
-        patch -p1 < static.patch
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config

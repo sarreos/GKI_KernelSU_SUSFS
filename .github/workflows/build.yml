@@ -138,7 +138,7 @@ jobs:
         sublevel: ${{ steps.extract.outputs.sublevel }}
         os_patch_level: ${{ inputs.os_patch_level }}
 
-    - name: Setup KernelSU-Next
+    - name: Setup ReSukiSU
       if: contains(inputs.feature_set, 'KSUN') || inputs.feature_set == 'FULL'
       uses: ./.github/actions/kernelsu
       with:
@@ -335,6 +335,17 @@ jobs:
 
     - name: Initialize Config Fragment
       run: touch "${{ github.workspace }}/wild_gki.fragment"
+
+    - name: Debug kernel version state
+      run: |
+        echo "=== git status ==="
+        git status --porcelain
+
+        echo "=== dirty references ==="
+        grep -R "dirty\|maybe-dirty" build/kernel/kleaf common/scripts scripts || true
+
+        echo "=== config ==="
+        grep CONFIG_LOCALVERSION_AUTO out/*/.config || true
 
     - name: Build Normal Kernel
       env:
