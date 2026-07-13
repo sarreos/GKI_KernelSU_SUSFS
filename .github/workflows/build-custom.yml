@@ -4,11 +4,6 @@ on:
   workflow_dispatch:
     inputs:
       # Optional: prefer a pre-composed feature_set string; if empty the booleans below are used
-      feature_set:
-        description: "Feature set (e.g. KSUN+SUSFS+BBG). Leave empty to use individual toggles."
-        type: string
-        required: false
-        default: ""
       enable_ksun:
         description: "Enable KernelSU"
         type: boolean
