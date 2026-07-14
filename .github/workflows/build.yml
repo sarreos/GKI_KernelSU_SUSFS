@@ -336,17 +336,6 @@ jobs:
     - name: Initialize Config Fragment
       run: touch "${{ github.workspace }}/wild_gki.fragment"
 
-    - name: Debug kernel version state
-      run: |
-        echo "=== git status ==="
-        git status --porcelain
-
-        echo "=== dirty references ==="
-        grep -R "dirty\|maybe-dirty" build/kernel/kleaf common/scripts scripts || true
-
-        echo "=== config ==="
-        grep CONFIG_LOCALVERSION_AUTO out/*/.config || true
-
     - name: Build Normal Kernel
       env:
         SOURCE_DATE_EPOCH: ${{ env.SOURCE_DATE_EPOCH }}
