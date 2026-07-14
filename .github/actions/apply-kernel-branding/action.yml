@@ -1,24 +1,20 @@
 name: 'Apply Kernel Branding & Timestamp'
-description: 'Apply Wild kernel branding to kernel version string'
+description: 'Apply kernel branding to kernel version string'
+
 inputs:
   variant:
-    description: 'Variant of kernel to apply branding to'
     required: true
   kernel_version:
-    description: 'Kernel version (e.g., 6.1)'
     required: true
   android_version:
-    description: 'Android version (e.g., android14)'
     required: true
   version:
-    description: 'Combined version (e.g., android14-6.1)'
     required: true
   sublevel:
-    description: 'Sublevel of kernel version (e.g., 1)'
     required: true
 
 runs:
-  using: "composite"
+  using: composite
   steps:
     - name: Apply Kernel Name Branding
       shell: bash
@@ -28,10 +24,27 @@ runs:
         ANDROID_PART=$(echo "$VERSION" | cut -d- -f1)
         KERNEL_PART=$(echo "$VERSION" | cut -d- -f2)
 
-        if [[ ${{ inputs.version }} == "android15-6.6" || ${{ inputs.version }} == "android16-6.12" ]]; then
-          KERNEL_STRING="$KERNEL_PART.${{ inputs.sublevel }}-$ANDROID_PART"
-          sed -i '$d' scripts/setlocalversion && echo "echo \"$KERNEL_STRING\"" >> scripts/setlocalversion
+        # KMI tag
+        case "$VERSION" in
+          android14-6.1)  KMI_TAG="11" ;;
+          android15-6.6)  KMI_TAG="8" ;;
+          android16-6.12) KMI_TAG="5" ;;
+          *) KMI_TAG="" ;;
+        esac
+
+        # Git hash (13 chars)
+        GHASH=$(git rev-parse --short=13 HEAD)
+
+        # Build ID (replace with your preferred source if desired)
+        BUILD_ID="ab$(printf "%08d" $((RANDOM << 15 | RANDOM)))"
+
+        if [[ "$VERSION" == "android15-6.6" || "$VERSION" == "android16-6.12" ]]; then
+          KERNEL_STRING="${KERNEL_PART}.${{ inputs.sublevel }}-${ANDROID_PART}-${KMI_TAG}-g${GHASH}-${BUILD_ID}"
         else
-          sed -i '$d' scripts/setlocalversion && echo "echo \"-$ANDROID_PART\"" >> scripts/setlocalversion
+          KERNEL_STRING="-${ANDROID_PART}-${KMI_TAG}-g${GHASH}-${BUILD_ID}"
         fi
+
+        sed -i '$d' scripts/setlocalversion
+        echo "echo \"$KERNEL_STRING\"" >> scripts/setlocalversion
+
         chmod +x scripts/setlocalversion
