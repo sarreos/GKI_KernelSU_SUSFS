@@ -186,6 +186,7 @@ jobs:
       with:
         version: ${{ inputs.version }}
         kernel_version: ${{ inputs.kernel_version }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: Apply Ptrace Patch
       uses: ./.github/actions/ptrace

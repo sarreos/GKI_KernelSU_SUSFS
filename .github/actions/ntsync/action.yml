@@ -7,6 +7,9 @@ inputs:
   kernel_version:
     description: 'Kernel version (e.g., 6.1)'
     required: true
+  sublevel:
+    description: 'Kernel sublevel'
+    required: true
 
 runs:
   using: 'composite'
@@ -23,19 +26,27 @@ runs:
           rm -f drivers/misc/ntsync.c
         fi
 
+        #if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
+        #  patch -p1 -N < ${{ github.action_path }}/patches/0001-lockdep-mark-local_lock_t.patch
+        #fi
+
+        #if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
+        #  patch -p1 -N < ${{ github.action_path }}/patches/0002-lockdep-fix-init-map-confusion.patch
+        #fi
+
+        if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
+          patch -p1 -N < ${{ github.action_path }}/patches/0003-lockdep-assert-none-held.patch
+        fi
+        
         if [[ ${{ inputs.version }} = "android13-5.10" ]]; then
-          cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android12-5.10.patch ${{ github.workspace }}/kernel/common
-          patch -p1 ntsync_compat_android12-5.10.patch
+          patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android12-5.10.patch
         elif [[ ${{ inputs.version }} = "android14-5.15" ]]; then
-          cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android13-5.15.patch ${{ github.workspace }}/kernel/common
-          patch -p1 ntsync_compat_android13-5.15.patch
+          patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_android13-5.15.patch
         else
-          cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.version }}.patch ${{ github.workspace }}/kernel/common
-          patch -p1 ntsync_compat_${{ inputs.version }}.patch
+          patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_compat_${{ inputs.version }}.patch
         fi
 
-        cp ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch ${{ github.workspace }}/kernel/common
-        patch -p1 < ntsync_base.patch
+        patch -p1 < ${{ github.workspace }}/kernel_patches/common/ntsync/ntsync_base.patch
 
     - name: Enable NTSync
       uses: ./.github/actions/set-kernel-config
