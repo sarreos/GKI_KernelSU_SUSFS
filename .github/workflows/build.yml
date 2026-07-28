@@ -207,6 +207,12 @@ jobs:
     - name: Setup Misc Configs
       uses: ./.github/actions/misc
 
+    - name: Enable BTF
+      uses: ./.github/actions/set-kernel-config
+      with:
+        config_list: |
+          CONFIG_DEBUG_INFO_BTF=y
+
     - name: Apply Device-Specific Patches
       uses: ./.github/actions/apply-device-patches
       with:

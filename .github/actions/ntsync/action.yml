@@ -26,13 +26,13 @@ runs:
           rm -f drivers/misc/ntsync.c
         fi
 
-        #if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
-        #  patch -p1 -N < ${{ github.action_path }}/patches/0001-lockdep-mark-local_lock_t.patch
-        #fi
+        if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
+          patch -p1 -N < ${{ github.action_path }}/patches/0001-lockdep-mark-local_lock_t.patch
+        fi
 
-        #if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
-        #  patch -p1 -N < ${{ github.action_path }}/patches/0002-lockdep-fix-init-map-confusion.patch
-        #fi
+        if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
+          patch -p1 -N < ${{ github.action_path }}/patches/0002-lockdep-fix-init-map-confusion.patch
+        fi
 
         if [[ ( ${{ inputs.version }} == "android12-5.10" && "${{ inputs.sublevel }}" -le "208" ) || ( ${{ inputs.version }} = "android13-5.10" && "${{ inputs.sublevel }}" -le "210" ) ]]; then
           patch -p1 -N < ${{ github.action_path }}/patches/0003-lockdep-assert-none-held.patch

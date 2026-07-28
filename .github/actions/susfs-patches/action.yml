@@ -37,6 +37,8 @@ runs:
           perl -0777 -i -pe 's{(if \(inode\) \{\n)\t\t/\*\n(\t\t \*[^\n]*\n)+\t\t \*/\n}{$1}g; s{^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
           perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
           perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
+          echo "Adding inotify_mark_user_mask function definition"
+          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
         fi
 
     - name: Apply Android 13 5.10 Fake Patches
@@ -50,6 +52,8 @@ runs:
           perl -0777 -i -pe 's{(if \(inode\) \{\n)\t\t/\*\n(\t\t \*[^\n]*\n)+\t\t \*/\n}{$1}g; s{^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;\n}{}m' fs/notify/fdinfo.c
           perl -i -pe 's/\bmask,\s*mark->ignored_mask/inotify_mark_user_mask(mark)/g' fs/notify/fdinfo.c
           perl -i -pe 's/ignored_mask:%x/ignored_mask:0/g' fs/notify/fdinfo.c
+          echo "Adding inotify_mark_user_mask function definition"
+          python3 -c 'import re;c=open("fs/notify/fdinfo.c").read();c=re.sub(r"^static void inotify_fdinfo\(struct seq_file \*m, struct fsnotify_mark \*mark\)$",lambda m:"static inline u32 inotify_mark_user_mask(struct fsnotify_mark *mark)\n{\n\treturn mark->mask & IN_ALL_EVENTS;\n}\n\n"+m.group(0),c,count=1,flags=re.MULTILINE);open("fs/notify/fdinfo.c","w").write(c)'
         fi
 
     - name: Apply Android 13 5.15 Fake Patches
@@ -157,4 +161,14 @@ runs:
         if grep -q '__fold_filemap_fixup_entry' fs/proc/task_mmu.c && ! grep -q '#include <linux/page_size_compat.h>' fs/proc/task_mmu.c; then
           sed -i '/#include <linux\/pkeys.h>/a #include <linux/page_size_compat.h>' fs/proc/task_mmu.c
           echo "Added page_size_compat.h include to fs/proc/task_mmu.c"
+        fi
+
+        # Fix set_nameidata() calls for 5.10 kernels.
+        # The SUSFS patch adds set_nameidata(nd, old_dfd, fake_filename, NULL) with 4 args,
+        # but 5.10 kernels only have 3-param set_nameidata(p, dfd, name) — no root param.
+        if [[ "${{ inputs.version }}" == "android12-5.10" || "${{ inputs.version }}" == "android13-5.10" ]]; then
+          if grep -q 'set_nameidata(nd, old_dfd, fake_filename, NULL)' fs/namei.c; then
+            echo "Fixing set_nameidata calls for 5.10 (4-arg -> 3-arg)"
+            sed -i 's/set_nameidata(nd, old_dfd, fake_filename, NULL)/set_nameidata(nd, old_dfd, fake_filename)/g' fs/namei.c
+          fi
         fi
