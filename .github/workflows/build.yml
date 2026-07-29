@@ -208,6 +208,7 @@ jobs:
       uses: ./.github/actions/misc
 
     - name: Enable BTF
+      if: ${{ inputs.kernel_version != '5.10' }}
       uses: ./.github/actions/set-kernel-config
       with:
         config_list: |
