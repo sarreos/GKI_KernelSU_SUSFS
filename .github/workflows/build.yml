@@ -208,11 +208,11 @@ jobs:
       uses: ./.github/actions/misc
 
     - name: Enable BTF
-      if: ${{ inputs.kernel_version != '5.10' }}
-      uses: ./.github/actions/set-kernel-config
+      uses: ./.github/actions/btf
       with:
-        config_list: |
-          CONFIG_DEBUG_INFO_BTF=y
+        version: ${{ inputs.version }}
+        kernel_version: ${{ inputs.kernel_version }}
+        sublevel: ${{ steps.extract.outputs.sublevel }}
 
     - name: Apply Device-Specific Patches
       uses: ./.github/actions/apply-device-patches
