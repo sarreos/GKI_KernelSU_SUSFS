@@ -33,7 +33,7 @@ runs:
     - name: Apply xdp_buff BTF-emit fix (android12-5.10)
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/common
-      if: ${{ inputs.version == 'android12-5.10' }}
+      if: false
       run: |
         set -euo pipefail
         # bpf_types.h references struct xdp_buff via
@@ -47,6 +47,27 @@ runs:
         # declared in xdp.c (filter.c already pulls it in).
         # Idempotent/harmless on newer sublevels.
         patch -p1 -N < ${{ github.action_path }}/patches/0003-btf-emit-xdp-buff.patch
+
+    - name: Apply resolve_btfids ELF_T_WORD endian fix (android12-5.10)
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel/common
+      if: false
+      run: |
+        set -euo pipefail
+        # Backport of upstream 61e8aeda9398 ("bpf: Fix libelf endian handling
+        # in resolv_btfids"). The .BTF_ids section content defaults to
+        # ELF_T_BYTE, so libelf does no per-word translation when
+        # resolve_btfids patches the section back with elf_update(); without
+        # ELF_T_WORD the BTF_ID entries (e.g. xdp_buff) are handled as raw
+        # bytes and resolution fails with "FAILED unresolved symbol xdp_buff".
+        # Sublevels >= 66 (2021-11+) already carry this fix in-tree, so only
+        # patch when it is missing (sublevel-43 trees: 2021-10 and lower) to
+        # stay idempotent under `set -e`.
+        if ! grep -q 'd_type = ELF_T_WORD' tools/bpf/resolve_btfids/main.c; then
+          patch -p1 -N < ${{ github.action_path }}/patches/0004-resolve_btfids-elf-word.patch
+        else
+          echo "resolve_btfids already has the ELF_T_WORD fix; skipping"
+        fi
 
     - name: Expose host dd for hermetic BTF generation (android12-5.10)
       shell: bash
