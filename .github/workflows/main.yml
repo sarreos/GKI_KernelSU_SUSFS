@@ -95,6 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download custom ccache once
+        if: false
         run: |
           set -uo pipefail
           echo "::group::Download ccache"
@@ -115,6 +116,7 @@ jobs:
           fi
           echo "::endgroup::"
       - name: Upload ccache artifact
+        if: false
         uses: actions/upload-artifact@v7
         with:
           name: ccache-binary

@@ -73,6 +73,9 @@ jobs:
 
     - name: Setup Build Environment
       uses: ./.github/actions/setup-build-environment
+      with:
+        version: ${{ inputs.version }}
+        sublevel: ${{ inputs.sublevel }}
       env:
         BOOT_SIGN_KEY: ${{ secrets.BOOT_SIGN_KEY }}
           
@@ -270,6 +273,7 @@ jobs:
         compression-level: 9
 
     - name: Get prebuilt ccache (downloaded once by prepare-ccache)
+      if: false
       uses: actions/download-artifact@v8
       with:
         name: ccache-binary
@@ -309,6 +313,7 @@ jobs:
           ${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ steps.extract.outputs.sublevel }}-
 
     - name: Cache ccache (GitHub Native)
+      if: false
       uses: actions/cache@v6
       with:
         path: /home/runner/.ccache
@@ -319,6 +324,7 @@ jobs:
           ccache-
 
     - name: Cache bazel-cache (GitHub Native)
+      if: false
       uses: actions/cache@v6
       with:
         path: /home/runner/.cache/bazel
