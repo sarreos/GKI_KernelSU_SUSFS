@@ -49,7 +49,7 @@ For GKI installation, please follow the official guide:
 
 ## ✨ Features
 
-- 🔐 **KernelSU**: A root solution for Android GKI devices that works in kernel mode and grants root permission to userspace applications directly in kernel space
+- 🔐 **ReSukiSU**: A KernelSU-based root solution with its own kernel and manager implementation
 - 🛡️ **SUSFS**: An addon root hiding kernel patches and userspace module for KernelSU
 
 ---
@@ -57,7 +57,7 @@ For GKI installation, please follow the official guide:
 ## 🏆 Credits
 
 - 🔐 **KernelSU**: Developed by [tiann](https://github.com/tiann/KernelSU)
-- 🚀 **KernelSU-Next**: Developed by [rifsxd](https://github.com/KernelSU-Next/KernelSU-Next)
+- 🚀 **ReSukiSU**: Developed by the [ReSukiSU contributors](https://github.com/ReSukiSU/ReSukiSU)
 - ✨ **Magic-KSU**: Developed by [5ec1cff](https://github.com/5ec1cff/KernelSU)
 - 🛡️ **SUSFS**: Developed by [simonpunk](https://gitlab.com/simonpunk/susfs4ksu.git)
 - 🛡️ **Baseband-guard (BBG)**: Developed by [vc-teahouse](https://github.com/vc-teahouse/Baseband-guard)

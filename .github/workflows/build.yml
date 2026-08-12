@@ -416,9 +416,9 @@ jobs:
           KERNEL_VER_STR=$(strings "/home/runner/out/Image" | grep -m1 "^Linux version " | sed 's/Linux version //' || echo "")
         fi
         
-        # Get KSU version from env (set by kernelsu action)
-        KSU_VER="${KSU_VERSION:-N/A}"
-        KSU_TAG="${KSU_GIT_TAG:-N/A}"
+        # Get ReSukiSU version from env (legacy KSU_* aliases remain supported).
+        RESUKISU_VER="${RESUKISU_VERSION:-${KSU_VERSION:-N/A}}"
+        RESUKISU_TAG="${RESUKISU_GIT_TAG:-${KSU_GIT_TAG:-N/A}}"
         
         # Get SUSFS version from susfs.h if available
         SUSFS_VER="N/A"
@@ -445,8 +445,8 @@ jobs:
           if [ -n "$KERNEL_VER_STR" ]; then
             echo "| **Version String** | \`${KERNEL_VER_STR}\` |"
           fi
-          echo "| **KSU Version** | ${KSU_VER} |"
-          echo "| **KSU Tag** | ${KSU_TAG} |"
+          echo "| **ReSukiSU Version** | ${RESUKISU_VER} |"
+          echo "| **ReSukiSU Tag** | ${RESUKISU_TAG} |"
           echo "| **SUSFS Version** | ${SUSFS_VER} |"
           echo "| **Feature Set** | ${{ inputs.feature_set }} |"
           echo "| **Variant** | ${{ inputs.variant }} |"

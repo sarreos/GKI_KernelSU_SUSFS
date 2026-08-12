@@ -2,7 +2,7 @@ name: Setup ReSukiSU
 description: Download and configure ReSukiSU with version tracking
 inputs:
   ksu_branch:
-    description: 'ReSukiSU branch or commit (empty = latest main branch tip)'
+    description: 'ReSukiSU branch, tag, or commit (empty = latest main branch tip)'
     required: false
     default: ""
 
@@ -23,7 +23,9 @@ runs:
             "$@" && return 0
             n=$((n+1))
             echo "retry $n/5 failed for: $*" >&2
-            sleep 5
+            if [ "$n" -lt 5 ]; then
+              sleep 5
+            fi
           done
           return 1
         }
@@ -34,38 +36,60 @@ runs:
           RESUKISU_INPUT="main"
         fi
 
+        curl -LSs --retry 5 --retry-delay 5 --retry-all-errors \
+          "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+
         # Try as branch first, fall back to commit
         if retry git ls-remote --heads "$RESUKISU_REPO" "$RESUKISU_INPUT" | grep -q .; then
           echo "Using ReSukiSU branch: $RESUKISU_INPUT"
-          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          retry git -C KernelSU/kernel fetch --depth=50 origin "$RESUKISU_INPUT"
-          git -C KernelSU/kernel checkout "origin/$RESUKISU_INPUT"
+          retry git -C KernelSU fetch origin "$RESUKISU_INPUT"
+          git -C KernelSU checkout -B "$RESUKISU_INPUT" "origin/$RESUKISU_INPUT"
         else
           echo "Using ReSukiSU commit: $RESUKISU_INPUT"
-          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          retry git -C KernelSU/kernel fetch --depth=50 origin "$RESUKISU_INPUT"
-          git -C KernelSU/kernel checkout "$RESUKISU_INPUT"
+          retry git -C KernelSU fetch origin "$RESUKISU_INPUT"
+          git -C KernelSU checkout --detach "$RESUKISU_INPUT"
         fi
 
-        cd KernelSU/kernel
+        if [ -f KernelSU/.git/shallow ]; then
+          echo "Fetching complete ReSukiSU history for accurate version metadata"
+          retry git -C KernelSU fetch --unshallow --tags origin
+        fi
     
     - name: Extract ReSukiSU Version Info
       id: resukisu-version
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
-        # Fetch main branch for version info (tags, commits, etc.)
-        git fetch --depth=50 origin main 2>/dev/null || true
-        
-        # Extract and export ReSukiSU version info from main branch
-        RESUKISU_GIT_VERSION=$(git rev-list --count origin/main 2>/dev/null)
-        RESUKISU_GIT_TAG=$(git describe --tags --abbrev=0 origin/main 2>/dev/null || echo "")
-        RESUKISU_COMMIT=$(git rev-parse --short origin/main 2>/dev/null)
-        RESUKISU_VERSION=$((30000 + RESUKISU_GIT_VERSION))
-        
-        echo "RESUKISU_GIT_TAG=$RESUKISU_GIT_TAG" >> $GITHUB_ENV
-        echo "RESUKISU_VERSION=$RESUKISU_VERSION" >> $GITHUB_ENV
-        echo "RESUKISU_COMMIT=$RESUKISU_COMMIT" >> $GITHUB_ENV
+        set -euo pipefail
+
+        # Match ReSukiSU's Kbuild version calculation for the selected revision.
+        RESUKISU_GIT_VERSION=$(git rev-list --count HEAD)
+        RESUKISU_GIT_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "v4.1.0")
+        RESUKISU_COMMIT=$(git rev-parse --short=8 HEAD)
+        RESUKISU_BRANCH=$(git branch --show-current)
+        if [ -z "$RESUKISU_BRANCH" ]; then
+          RESUKISU_BRANCH="${{ inputs.ksu_branch }}"
+        fi
+        if [ -z "$RESUKISU_BRANCH" ]; then
+          RESUKISU_BRANCH="main"
+        fi
+        RESUKISU_VERSION=$((30000 + RESUKISU_GIT_VERSION + 700))
+
+        {
+          echo "RESUKISU_BRANCH=$RESUKISU_BRANCH"
+          echo "RESUKISU_GIT_VERSION=$RESUKISU_GIT_VERSION"
+          echo "RESUKISU_GIT_TAG=$RESUKISU_GIT_TAG"
+          echo "RESUKISU_VERSION=$RESUKISU_VERSION"
+          echo "RESUKISU_COMMIT=$RESUKISU_COMMIT"
+
+          # Compatibility for existing build summaries and release templates.
+          echo "KSUN_BRANCH=$RESUKISU_BRANCH"
+          echo "KSUN_COMMIT=$RESUKISU_COMMIT"
+          echo "KSU_COMMITS_COUNT=$RESUKISU_GIT_VERSION"
+          echo "KSU_GIT_TAG=$RESUKISU_GIT_TAG"
+          echo "KSU_VERSION=$RESUKISU_VERSION"
+          echo "KSU_COMMIT=$RESUKISU_COMMIT"
+        } >> "$GITHUB_ENV"
 
     - name: Enable Kernel Configs
       uses: ./.github/actions/set-kernel-config

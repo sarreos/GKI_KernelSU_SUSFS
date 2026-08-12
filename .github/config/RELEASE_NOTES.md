@@ -8,7 +8,7 @@
 Join the telegram here: https://t.me/WildKernelsTG
 
 # Features
-- [KernelSU-Next](#kernelsu-next)
+- [ReSukiSU](#resukisu)
 - [SUSFS v2.2.0](#susfs-v220)
 - [Baseband Guard (BBG)](#baseband-guard-bbg)
 - [DroidSpaces-OSS](#droidspaces-oss)
@@ -18,29 +18,26 @@ Join the telegram here: https://t.me/WildKernelsTG
 
 <!-- NOTE: Anchor links above must match the heading IDs below. GitHub Flavored Markdown auto-generates anchors from heading text, but since these headings contain links, we use explicit IDs for reliable navigation. -->
 
-## [KernelSU-Next](https://github.com/pershoot/KernelSU-Next) {#kernelsu-next}
+## [ReSukiSU](https://github.com/ReSukiSU/ReSukiSU) {#resukisu}
 
 A kernel-based root solution for Android devices.
 
-> [!WARNING]
-> This release uses the [pershoot/KernelSU-Next](https://github.com/pershoot/KernelSU-Next) fork. The fork maintainer has said it is not ready for production use, so treat it as use at your own risk.
-
-Manager: {{KSU_MANAGER}}
+Manager: {{RESUKISU_MANAGER}}
 
 > [!IMPORTANT]
-> For best compatiblity ensure your Manager Version and Kernel Version match eg. 30100 = 30100.
+> For best compatibility, ensure your manager and kernel version codes match, e.g. 35057 = 35057.
 
 **Version**  
-`{{KSU_VERSION}}`
+`{{RESUKISU_VERSION}}`
 
 **Tag**  
-`{{KSU_GIT_TAG}}`
+`{{RESUKISU_GIT_TAG}}`
 
 **Branch**  
-`{{KSUN_BRANCH}}`
+`{{RESUKISU_BRANCH}}`
 
 **Commit**  
-`{{KSUN_COMMIT}}`
+`{{RESUKISU_COMMIT}}`
 
 ## [SUSFS v2.2.0](https://gitlab.com/simonpunk/susfs4ksu) {#susfs-v220}
 
@@ -127,8 +124,8 @@ b. KSU LKM (boot/init_boot/vendor_boot‑patched): Flash back the stock boot/ini
 c. KSU GKI: if you are 100% sure you already flashed stock init_boot/boot/vendor_boot, no action is needed; otherwise, follow the same steps as KSU LKM.
 d. APatch: remove /data/adb contents to avoid leftover root conflicts after flashing the AnyKernel3 ZIP.
 Flash the ZIP to the active slot using Kernel Flasher.
-Install the KernelSU‑Next Manager APK, same version as mentioned in the release notes.
-Open the KernelSU‑Next app.
+Install the ReSukiSU Manager APK linked in the release notes.
+Open the ReSukiSU app.
 Reboot the device if you performed any cleanup in step 2
 
 ## Force Load Kernel Modules (Bypass) — flashing with `Bypass-Image`

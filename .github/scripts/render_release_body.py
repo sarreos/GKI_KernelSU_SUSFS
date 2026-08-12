@@ -4,14 +4,48 @@ import sys
 from pathlib import Path
 
 
+def metadata(primary, legacy, default):
+    return os.environ.get(primary) or os.environ.get(legacy, default)
+
+
 PLACEHOLDERS = {
-    "{{KSU_VERSION}}": lambda: os.environ.get("KSU_VERSION", "unknown"),
-    "{{KSU_GIT_TAG}}": lambda: os.environ.get("KSU_GIT_TAG", "no-tag"),
-    "{{KSUN_BRANCH}}": lambda: os.environ.get("KSUN_BRANCH", "dev"),
-    "{{KSUN_COMMIT}}": lambda: os.environ.get("KSUN_COMMIT", "unknown"),
-    "{{KSU_MANAGER}}": lambda: os.environ.get("KSU_MANAGER", "Placeholder"),
-    "{{SUSFS_BRANCHES}}": lambda: os.environ.get("SUSFS_COMMIT", "latest on auto-derived gki-{version} branch"),
-    "{{SUSFS_BRANCHS}}": lambda: os.environ.get("SUSFS_COMMIT", "latest on auto-derived gki-{version} branch"),
+    "{{RESUKISU_VERSION}}": lambda: metadata(
+        "RESUKISU_VERSION", "KSU_VERSION", "unknown"
+    ),
+    "{{RESUKISU_GIT_TAG}}": lambda: metadata(
+        "RESUKISU_GIT_TAG", "KSU_GIT_TAG", "no-tag"
+    ),
+    "{{RESUKISU_BRANCH}}": lambda: metadata(
+        "RESUKISU_BRANCH", "KSUN_BRANCH", "main"
+    ),
+    "{{RESUKISU_COMMIT}}": lambda: metadata(
+        "RESUKISU_COMMIT", "KSUN_COMMIT", "unknown"
+    ),
+    "{{RESUKISU_MANAGER}}": lambda: metadata(
+        "RESUKISU_MANAGER", "KSU_MANAGER", "Unavailable"
+    ),
+    # Backward-compatible placeholders for older release templates.
+    "{{KSU_VERSION}}": lambda: metadata(
+        "RESUKISU_VERSION", "KSU_VERSION", "unknown"
+    ),
+    "{{KSU_GIT_TAG}}": lambda: metadata(
+        "RESUKISU_GIT_TAG", "KSU_GIT_TAG", "no-tag"
+    ),
+    "{{KSUN_BRANCH}}": lambda: metadata(
+        "RESUKISU_BRANCH", "KSUN_BRANCH", "main"
+    ),
+    "{{KSUN_COMMIT}}": lambda: metadata(
+        "RESUKISU_COMMIT", "KSUN_COMMIT", "unknown"
+    ),
+    "{{KSU_MANAGER}}": lambda: metadata(
+        "RESUKISU_MANAGER", "KSU_MANAGER", "Unavailable"
+    ),
+    "{{SUSFS_BRANCHES}}": lambda: os.environ.get(
+        "SUSFS_COMMIT", "latest on auto-derived gki-{version} branch"
+    ),
+    "{{SUSFS_BRANCHS}}": lambda: os.environ.get(
+        "SUSFS_COMMIT", "latest on auto-derived gki-{version} branch"
+    ),
 }
 
 
@@ -55,19 +89,31 @@ emit("**IMPORTANT DISCLAIMER**")
 for line in data["release"]["disclaimer"]:
     emit(line)
 
-kernelsu = data.get("kernelsu", {})
+resukisu = data.get("resukisu", data.get("kernelsu", {}))
 emit()
-emit(f"## {kernelsu.get('name', 'KernelSU-Next')}")
-emit(f"- Version: {os.environ.get('KSU_VERSION', kernelsu.get('version', 'unknown'))}")
-emit(f"- Tag: {os.environ.get('KSU_GIT_TAG', kernelsu.get('tag', 'no-tag'))}")
-emit(f"- Branch: {os.environ.get('KSUN_BRANCH', kernelsu.get('branch', 'dev'))}")
-emit(f"- Commit: {os.environ.get('KSUN_COMMIT', kernelsu.get('commit', 'unknown'))}")
-if kernelsu.get("url"):
-    emit(f"- URL: {kernelsu['url']}")
-if kernelsu.get("manager"):
-    emit(f"- Manager: {kernelsu['manager']}")
+emit(f"## {resukisu.get('name', 'ReSukiSU')}")
+version = metadata(
+    "RESUKISU_VERSION", "KSU_VERSION", resukisu.get("version", "unknown")
+)
+tag = metadata(
+    "RESUKISU_GIT_TAG", "KSU_GIT_TAG", resukisu.get("tag", "no-tag")
+)
+branch = metadata(
+    "RESUKISU_BRANCH", "KSUN_BRANCH", resukisu.get("branch", "main")
+)
+commit = metadata(
+    "RESUKISU_COMMIT", "KSUN_COMMIT", resukisu.get("commit", "unknown")
+)
+emit(f"- Version: {version}")
+emit(f"- Tag: {tag}")
+emit(f"- Branch: {branch}")
+emit(f"- Commit: {commit}")
+if resukisu.get("url"):
+    emit(f"- URL: {resukisu['url']}")
+if resukisu.get("manager"):
+    emit(f"- Manager: {resukisu['manager']}")
 
-skip_keys = {"release", "kernelsu"}
+skip_keys = {"release", "resukisu", "kernelsu"}
 for key in data.keys():
     if key in skip_keys:
         continue

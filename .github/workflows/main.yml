@@ -49,7 +49,7 @@ on:
           - FULL
         default: FULL
       ksu_branch:
-        description: "KernelSU branch or commit (empty = latest dev-susfs branch tip)"
+        description: "ReSukiSU branch, tag, or commit (empty = latest main branch tip)"
         type: string
         required: false
         default: ""
@@ -316,7 +316,7 @@ jobs:
           echo "# 📋 Build Summary — $(date -u '+%Y-%m-%d %H:%M UTC')"
           echo
           echo "**Feature Set:** ${{ inputs.feature_set }}"
-          echo "**KSU Branch:** ${{ inputs.ksu_branch || 'latest dev' }}"
+          echo "**ReSukiSU Revision:** ${{ inputs.ksu_branch || 'latest main' }}"
           echo
           
           # Count successes and failures
@@ -494,59 +494,84 @@ jobs:
 
         echo "release_title=$release_title" >> "$GITHUB_OUTPUT"
 
-    - name: Extract KernelSU Version Info
-      id: ksu_version
+    - name: Extract ReSukiSU Version Info
+      id: resukisu_version
       run: |
         set -euo pipefail
 
-        KSU_REPO="https://github.com/pershoot/KernelSU-Next.git"
-        KSU_INPUT="${{ inputs.ksu_branch }}"
-        if [ -z "$KSU_INPUT" ]; then
-          KSU_INPUT="dev-susfs"
+        retry() {
+          local n=0
+          until [ "$n" -ge 5 ]; do
+            "$@" && return 0
+            n=$((n+1))
+            echo "retry $n/5 failed for: $*" >&2
+            if [ "$n" -lt 5 ]; then
+              sleep 5
+            fi
+          done
+          return 1
+        }
+
+        RESUKISU_REPO="https://github.com/ReSukiSU/ReSukiSU.git"
+        RESUKISU_DIR="$RUNNER_TEMP/resukisu"
+        RESUKISU_INPUT="${{ inputs.ksu_branch }}"
+        if [ -z "$RESUKISU_INPUT" ]; then
+          RESUKISU_INPUT="main"
         fi
+
+        clone_resukisu() {
+          rm -rf "$RESUKISU_DIR"
+          git clone "$@" "$RESUKISU_DIR"
+        }
 
         # Try as branch first, fall back to commit
-        if git ls-remote --heads "$KSU_REPO" "$KSU_INPUT" | grep -q .; then
-          echo "Cloning KernelSU-Next from branch: $KSU_INPUT"
-          git clone --branch "$KSU_INPUT" "$KSU_REPO" /tmp/kernelsu-next
-          cd /tmp/kernelsu-next
-          KSUN_COMMIT=$(git rev-parse HEAD)
+        if retry git ls-remote --heads "$RESUKISU_REPO" "$RESUKISU_INPUT" | grep -q .; then
+          echo "Cloning ReSukiSU branch: $RESUKISU_INPUT"
+          retry clone_resukisu --branch "$RESUKISU_INPUT" "$RESUKISU_REPO"
         else
-          echo "Cloning KernelSU-Next from dev-susfs branch, then checking out commit: $KSU_INPUT"
-          git clone --branch dev-susfs "$KSU_REPO" /tmp/kernelsu-next
-          cd /tmp/kernelsu-next
-          git fetch --depth=50 origin "$KSU_INPUT"
-          git checkout "$KSU_INPUT"
-          KSUN_COMMIT="$KSU_INPUT"
+          echo "Cloning ReSukiSU main, then checking out revision: $RESUKISU_INPUT"
+          retry clone_resukisu "$RESUKISU_REPO"
+          retry git -C "$RESUKISU_DIR" fetch origin "$RESUKISU_INPUT"
+          git -C "$RESUKISU_DIR" checkout --detach "$RESUKISU_INPUT"
         fi
 
-        # Extract version info
-        COMMITS_COUNT=$(git rev-list --count HEAD)
-        BASE_VERSION=30000
-        KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
+        cd "$RESUKISU_DIR"
+        RESUKISU_COMMITS_COUNT=$(git rev-list --count HEAD)
+        RESUKISU_VERSION=$((30000 + RESUKISU_COMMITS_COUNT + 700))
+        RESUKISU_GIT_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "v4.1.0")
+        RESUKISU_COMMIT_FULL=$(git rev-parse HEAD)
+        RESUKISU_COMMIT=$(git rev-parse --short=8 HEAD)
 
-        # Extract git tag
-        KSU_GIT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "no-tag")
-
-        MANAGER_RUN_ID=$(curl -fsSL "https://api.github.com/repos/pershoot/KernelSU-Next/actions/workflows/build-manager-ci.yml/runs?head_sha=${KSUN_COMMIT}" | jq -r '.workflow_runs[0].id // empty')
+        MANAGER_RUN_ID=$(curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors \
+          "https://api.github.com/repos/ReSukiSU/ReSukiSU/actions/workflows/build-manager.yml/runs?head_sha=${RESUKISU_COMMIT_FULL}" \
+          | jq -r '.workflow_runs[0].id // empty')
         if [[ -n "${MANAGER_RUN_ID:-}" ]]; then
-          KSU_MANAGER="https://github.com/pershoot/KernelSU-Next/actions/runs/${MANAGER_RUN_ID}"
+          RESUKISU_MANAGER="https://github.com/ReSukiSU/ReSukiSU/actions/runs/${MANAGER_RUN_ID}"
         else
-          KSU_MANAGER="https://github.com/pershoot/KernelSU-Next/actions/workflows/build-manager-ci.yml"
+          RESUKISU_MANAGER="https://github.com/ReSukiSU/ReSukiSU/actions/workflows/build-manager.yml"
         fi
 
-        echo "Commits count: $COMMITS_COUNT"
-        echo "KSU Version: $KSU_VERSION"
-        echo "KSU Git Tag: $KSU_GIT_TAG"
-        echo "KSU Manager: $KSU_MANAGER"
+        echo "ReSukiSU commits count: $RESUKISU_COMMITS_COUNT"
+        echo "ReSukiSU version: $RESUKISU_VERSION"
+        echo "ReSukiSU tag: $RESUKISU_GIT_TAG"
+        echo "ReSukiSU manager: $RESUKISU_MANAGER"
 
-        # Export as environment for next step
-        echo "KSUN_BRANCH=$KSU_INPUT" >> $GITHUB_ENV
-        echo "KSUN_COMMIT=$KSUN_COMMIT" >> $GITHUB_ENV
-        echo "KSU_COMMITS_COUNT=$COMMITS_COUNT" >> $GITHUB_ENV
-        echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
-        echo "KSU_GIT_TAG=$KSU_GIT_TAG" >> $GITHUB_ENV
-        echo "KSU_MANAGER=$KSU_MANAGER" >> $GITHUB_ENV
+        {
+          echo "RESUKISU_BRANCH=$RESUKISU_INPUT"
+          echo "RESUKISU_COMMIT=$RESUKISU_COMMIT"
+          echo "RESUKISU_COMMITS_COUNT=$RESUKISU_COMMITS_COUNT"
+          echo "RESUKISU_VERSION=$RESUKISU_VERSION"
+          echo "RESUKISU_GIT_TAG=$RESUKISU_GIT_TAG"
+          echo "RESUKISU_MANAGER=$RESUKISU_MANAGER"
+
+          # Compatibility with existing release rendering.
+          echo "KSUN_BRANCH=$RESUKISU_INPUT"
+          echo "KSUN_COMMIT=$RESUKISU_COMMIT"
+          echo "KSU_COMMITS_COUNT=$RESUKISU_COMMITS_COUNT"
+          echo "KSU_VERSION=$RESUKISU_VERSION"
+          echo "KSU_GIT_TAG=$RESUKISU_GIT_TAG"
+          echo "KSU_MANAGER=$RESUKISU_MANAGER"
+        } >> "$GITHUB_ENV"
 
     - name: Set release body
       run: |

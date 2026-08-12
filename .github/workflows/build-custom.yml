@@ -61,7 +61,7 @@ on:
         required: false
         default: "2026-03"
       ksu_branch:
-        description: "KernelSU (empty = main branch)"
+        description: "ReSukiSU branch, tag, or commit (empty = main branch)"
         type: string
         required: false
         default: ""
