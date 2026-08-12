@@ -128,7 +128,15 @@ runs:
         # the bundled libbpf/btf_encoder fail under newer GCC as -Werror.
         PAHOLE_SRC="$HOME/dwarves"
         rm -rf "$PAHOLE_SRC"
-        git clone --depth 1 --branch v1.31 https://github.com/acmel/dwarves.git "$PAHOLE_SRC"
+        # Retry transient network errors (up to 5 attempts, 5s backoff).
+        for i in 1 2 3 4 5; do
+          if git clone --depth 1 --branch v1.31 https://github.com/acmel/dwarves.git "$PAHOLE_SRC"; then
+            break
+          fi
+          echo "dwarves clone attempt $i failed; retrying in 5s"
+          rm -rf "$PAHOLE_SRC"
+          sleep 5
+        done
         mkdir -p "$PAHOLE_SRC/build"
         cd "$PAHOLE_SRC/build"
         cmake -D__LIB=lib -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release .. >/dev/null

@@ -15,6 +15,19 @@ runs:
       run: |
         set -euo pipefail
 
+        # Retry transient network errors (up to 5 attempts, 5s backoff).
+        # Diagnostics go to stderr so pipes to grep are not polluted.
+        retry() {
+          local n=0
+          until [ "$n" -ge 5 ]; do
+            "$@" && return 0
+            n=$((n+1))
+            echo "retry $n/5 failed for: $*" >&2
+            sleep 5
+          done
+          return 1
+        }
+
         RESUKISU_REPO="https://github.com/ReSukiSU/ReSukiSU.git"
         RESUKISU_INPUT="${{ inputs.ksu_branch }}"
         if [ -z "$RESUKISU_INPUT" ]; then
@@ -22,15 +35,15 @@ runs:
         fi
 
         # Try as branch first, fall back to commit
-        if git ls-remote --heads "$RESUKISU_REPO" "$RESUKISU_INPUT" | grep -q .; then
+        if retry git ls-remote --heads "$RESUKISU_REPO" "$RESUKISU_INPUT" | grep -q .; then
           echo "Using ReSukiSU branch: $RESUKISU_INPUT"
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          git -C KernelSU/kernel fetch --depth=50 origin "$RESUKISU_INPUT"
+          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          retry git -C KernelSU/kernel fetch --depth=50 origin "$RESUKISU_INPUT"
           git -C KernelSU/kernel checkout "origin/$RESUKISU_INPUT"
         else
           echo "Using ReSukiSU commit: $RESUKISU_INPUT"
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
-          git -C KernelSU/kernel fetch --depth=50 origin "$RESUKISU_INPUT"
+          curl -LSs --retry 5 --retry-delay 5 --retry-all-errors "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          retry git -C KernelSU/kernel fetch --depth=50 origin "$RESUKISU_INPUT"
           git -C KernelSU/kernel checkout "$RESUKISU_INPUT"
         fi
 
