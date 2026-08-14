@@ -112,7 +112,7 @@ jobs:
       kernel_version: ${{ github.event.inputs.kernel_version }}
       sublevel: ${{ github.event.inputs.sublevel }}
       os_patch_level: ${{ github.event.inputs.os_patch_level }}
-      variant: ${{ github.event.inputs.variant }}
+      variant: Custom
       feature_set: ${{ needs.compute-feature-set.outputs.feature_set }}
       ksu_branch: ${{ github.event.inputs.ksu_branch }}
       susfs_commit: ${{ github.event.inputs.susfs_commit }}
