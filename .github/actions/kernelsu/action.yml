@@ -1,15 +1,15 @@
-name: Setup ReSukiSU
-description: Download and configure ReSukiSU with version tracking
+name: Setup KOWX712 KernelSU
+description: Download and configure KOWX712's KernelSU fork with version tracking
 inputs:
   ksu_branch:
-    description: 'ReSukiSU branch, tag, or commit (empty = latest main branch tip)'
+    description: 'KOWX712 KernelSU branch, tag, or commit (empty = latest master branch tip)'
     required: false
     default: ""
 
 runs:
   using: composite
   steps:
-    - name: Download ReSukiSU
+    - name: Download KOWX712 KernelSU
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
       run: |
@@ -30,50 +30,50 @@ runs:
           return 1
         }
 
-        RESUKISU_REPO="https://github.com/ReSukiSU/ReSukiSU.git"
+        RESUKISU_REPO="https://github.com/KOWX712/KernelSU.git"
         RESUKISU_INPUT="${{ inputs.ksu_branch }}"
         if [ -z "$RESUKISU_INPUT" ]; then
-          RESUKISU_INPUT="main"
+          RESUKISU_INPUT="master"
         fi
 
         curl -LSs --retry 5 --retry-delay 5 --retry-all-errors \
-          "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          "https://raw.githubusercontent.com/KOWX712/KernelSU/refs/heads/master/kernel/setup.sh" | bash -s master
 
         # Try as branch first, fall back to commit
         if retry git ls-remote --heads "$RESUKISU_REPO" "$RESUKISU_INPUT" | grep -q .; then
-          echo "Using ReSukiSU branch: $RESUKISU_INPUT"
+          echo "Using KOWX712 KernelSU branch: $RESUKISU_INPUT"
           retry git -C KernelSU fetch origin "$RESUKISU_INPUT"
           git -C KernelSU checkout -B "$RESUKISU_INPUT" "origin/$RESUKISU_INPUT"
         else
-          echo "Using ReSukiSU commit: $RESUKISU_INPUT"
+          echo "Using KOWX712 KernelSU tag or commit: $RESUKISU_INPUT"
           retry git -C KernelSU fetch origin "$RESUKISU_INPUT"
           git -C KernelSU checkout --detach "$RESUKISU_INPUT"
         fi
 
         if [ -f KernelSU/.git/shallow ]; then
-          echo "Fetching complete ReSukiSU history for accurate version metadata"
+          echo "Fetching complete KOWX712 KernelSU history for accurate version metadata"
           retry git -C KernelSU fetch --unshallow --tags origin
         fi
     
-    - name: Extract ReSukiSU Version Info
+    - name: Extract KOWX712 KernelSU Version Info
       id: resukisu-version
       shell: bash
       working-directory: ${{ github.workspace }}/kernel/KernelSU
       run: |
         set -euo pipefail
 
-        # Match ReSukiSU's Kbuild version calculation for the selected revision.
+        # Match KOWX712 KernelSU's Kbuild version calculation for the selected revision.
         RESUKISU_GIT_VERSION=$(git rev-list --count HEAD)
-        RESUKISU_GIT_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "v4.1.0")
+        RESUKISU_GIT_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "N/A")
         RESUKISU_COMMIT=$(git rev-parse --short=8 HEAD)
         RESUKISU_BRANCH=$(git branch --show-current)
         if [ -z "$RESUKISU_BRANCH" ]; then
           RESUKISU_BRANCH="${{ inputs.ksu_branch }}"
         fi
         if [ -z "$RESUKISU_BRANCH" ]; then
-          RESUKISU_BRANCH="main"
+          RESUKISU_BRANCH="master"
         fi
-        RESUKISU_VERSION=$((30000 + RESUKISU_GIT_VERSION + 700))
+        RESUKISU_VERSION=$((30000 + RESUKISU_GIT_VERSION))
 
         {
           echo "RESUKISU_BRANCH=$RESUKISU_BRANCH"
