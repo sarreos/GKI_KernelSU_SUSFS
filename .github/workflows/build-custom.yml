@@ -1,0 +1,304 @@
+name: build-custom
+
+permissions:
+  contents: read
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernelsu_flavor:
+        description: "KernelSU flavor"
+        type: choice
+        required: true
+        options:
+          - ReSukiSU
+          - KernelSU-Next
+          - Classic KernelSU
+          - None
+        default: ReSukiSU
+      enable_susfs:
+        description: "Enable SUSFS"
+        type: boolean
+        required: false
+        default: false
+      enable_bbg:
+        description: "Enable BBG"
+        type: boolean
+        required: false
+        default: true
+      enable_net:
+        description: "Enable Networking"
+        type: boolean
+        required: false
+        default: true
+      enable_ds:
+        description: "Enable DS"
+        type: boolean
+        required: false
+        default: false
+      enable_nomount:
+        description: "Enable NoMount"
+        type: boolean
+        required: false
+        default: false
+      build_bypass:
+        description: "Build bypass kernel (uncheck to disable)"
+        type: boolean
+        required: false
+        default: true
+      version:
+        description: "version"
+        type: string
+        required: false
+        default: "android14-6.1"
+      android_version:
+        description: "Android version"
+        type: string
+        required: false
+        default: "android14"
+      kernel_version:
+        description: "Kernel Version"
+        type: string
+        required: false
+        default: "6.1"
+      sublevel:
+        description: "Sublevel"
+        type: string
+        required: false
+        default: "162"
+      os_patch_level:
+        description: "OS patch level"
+        type: string
+        required: false
+        default: "2026-03"
+      ksu_branch:
+        description: "Selected KernelSU branch, tag, or commit (empty = flavor default)"
+        type: string
+        required: false
+        default: ""
+      susfs_commit:
+        description: "SUSFS commit (empty = latest version branch)"
+        type: string
+        required: false
+        default: ""
+
+jobs:
+  resolve:
+    name: Resolve features and KernelSU flavor
+    runs-on: ubuntu-latest
+    outputs:
+      feature_set: ${{ steps.resolve.outputs.feature_set }}
+      root_flavor: ${{ steps.resolve.outputs.root_flavor }}
+      root_commit: ${{ steps.resolve.outputs.root_commit }}
+      nomount_commit: ${{ steps.resolve.outputs.nomount_commit }}
+      variant: ${{ steps.resolve.outputs.variant }}
+    steps:
+      - name: Resolve selection
+        id: resolve
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          ANDROID_VERSION: ${{ inputs.android_version }}
+          KERNEL_VERSION: ${{ inputs.kernel_version }}
+          KERNELSU_FLAVOR: ${{ inputs.kernelsu_flavor }}
+          KSU_REVISION: ${{ inputs.ksu_branch }}
+          ENABLE_SUSFS: ${{ inputs.enable_susfs }}
+          ENABLE_BBG: ${{ inputs.enable_bbg }}
+          ENABLE_NETWORKING: ${{ inputs.enable_net }}
+          ENABLE_DS: ${{ inputs.enable_ds }}
+          ENABLE_NOMOUNT: ${{ inputs.enable_nomount }}
+        run: |
+          set -euo pipefail
+
+          if [ "$VERSION" != "${ANDROID_VERSION}-${KERNEL_VERSION}" ]; then
+            echo "version must equal android_version-kernel_version; got '$VERSION' and '${ANDROID_VERSION}-${KERNEL_VERSION}'." >&2
+            exit 2
+          fi
+
+          case "$KERNELSU_FLAVOR" in
+            "ReSukiSU")
+              root_flavor="resukisu"
+              root_repo="https://github.com/ReSukiSU/ReSukiSU.git"
+              default_root_ref="refs/heads/main"
+              variant="ReSukiSU"
+              ;;
+            "KernelSU-Next")
+              root_flavor="next"
+              root_repo="https://github.com/KernelSU-Next/KernelSU-Next.git"
+              default_root_ref="refs/heads/dev"
+              variant="KernelSU-Next"
+              ;;
+            "Classic KernelSU")
+              root_flavor="classic"
+              root_repo="https://github.com/tiann/KernelSU.git"
+              default_root_ref="refs/heads/main"
+              variant="Classic-KernelSU"
+              ;;
+            "None")
+              root_flavor=""
+              root_repo=""
+              default_root_ref=""
+              variant="Custom"
+              ;;
+            *)
+              echo "Unsupported KernelSU flavor: $KERNELSU_FLAVOR" >&2
+              exit 2
+              ;;
+          esac
+
+          if [ "$ENABLE_SUSFS" = "true" ] && [ -z "$root_flavor" ]; then
+            echo "SUSFS requires a KernelSU flavor." >&2
+            exit 2
+          fi
+
+          parts=()
+          add_feature() {
+            local token="$1"
+            local enabled="$2"
+            if [ "$enabled" = "true" ]; then
+              parts+=("$token")
+            fi
+          }
+
+          add_feature SUSFS "$ENABLE_SUSFS"
+          add_feature BBG "$ENABLE_BBG"
+          add_feature NET "$ENABLE_NETWORKING"
+          add_feature DS "$ENABLE_DS"
+          add_feature NOMOUNT "$ENABLE_NOMOUNT"
+
+          if [ "${#parts[@]}" -eq 0 ]; then
+            feature_set="NONE"
+          else
+            feature_set="$(IFS=+; echo "${parts[*]}")"
+          fi
+
+          resolve_revision() {
+            local repo="$1"
+            local requested="$2"
+            local default_ref="$3"
+            local label="$4"
+            local refs=()
+            local ref sha
+
+            if [[ "$requested" =~ ^[0-9a-f]{40}$ ]]; then
+              printf '%s\n' "$requested"
+              return 0
+            fi
+
+            if [ -z "$requested" ]; then
+              refs+=("$default_ref")
+            elif [[ "$requested" == refs/* ]]; then
+              refs+=("$requested")
+            else
+              refs+=("refs/heads/$requested")
+              refs+=("refs/tags/$requested^{}")
+              refs+=("refs/tags/$requested")
+            fi
+
+            for attempt in 1 2 3 4 5; do
+              for ref in "${refs[@]}"; do
+                sha="$(git ls-remote "$repo" "$ref" 2>/dev/null | awk 'NR == 1 { print $1 }')"
+                if [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+                  printf '%s\n' "$sha"
+                  return 0
+                fi
+              done
+              echo "$label resolution attempt $attempt failed; retrying..." >&2
+              sleep 5
+            done
+
+            echo "Failed to resolve $label to an immutable commit." >&2
+            return 1
+          }
+
+          root_commit=""
+          if [ -n "$root_flavor" ]; then
+            root_commit="$(resolve_revision \
+              "$root_repo" \
+              "$KSU_REVISION" \
+              "$default_root_ref" \
+              "$KERNELSU_FLAVOR")"
+          fi
+
+          nomount_commit=""
+          if [ "$ENABLE_NOMOUNT" = "true" ]; then
+            nomount_commit="$(resolve_revision \
+              "https://github.com/maxsteeel/nomount.git" \
+              "" \
+              "refs/heads/dev" \
+              "NoMount dev")"
+          fi
+
+          {
+            echo "feature_set=$feature_set"
+            echo "root_flavor=$root_flavor"
+            echo "root_commit=$root_commit"
+            echo "nomount_commit=$nomount_commit"
+            echo "variant=$variant"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Custom build selection"
+            echo
+            echo "- Target: \`${VERSION}.${{ inputs.sublevel }}\`"
+            echo "- OS patch level: \`${{ inputs.os_patch_level }}\`"
+            echo "- KernelSU flavor: \`${KERNELSU_FLAVOR}\`"
+            echo "- Feature set: \`${feature_set}\`"
+            if [ -n "$root_commit" ]; then
+              echo "- KernelSU commit: \`${root_commit}\`"
+            fi
+            if [ -n "$nomount_commit" ]; then
+              echo "- NoMount commit: \`${nomount_commit}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build-nomount-module:
+    name: Build matching NoMount metamodule
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        if: ${{ contains(needs.resolve.outputs.feature_set, 'NOMOUNT') }}
+        uses: actions/checkout@v7
+
+      - name: Build NoMount metamodule
+        id: nomount-metamodule
+        if: ${{ contains(needs.resolve.outputs.feature_set, 'NOMOUNT') }}
+        uses: ./.github/actions/nomount-metamodule
+        with:
+          commit: ${{ needs.resolve.outputs.nomount_commit }}
+
+      - name: Upload NoMount metamodule
+        if: ${{ contains(needs.resolve.outputs.feature_set, 'NOMOUNT') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: NoMount-Metamodule
+          path: ${{ steps.nomount-metamodule.outputs.module_path }}
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: NoMount not selected
+        if: ${{ !contains(needs.resolve.outputs.feature_set, 'NOMOUNT') }}
+        run: echo "NoMount is disabled; no metamodule is needed."
+
+  build-single:
+    name: Run build (${{ needs.resolve.outputs.variant }})
+    needs:
+      - resolve
+      - build-nomount-module
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ inputs.version }}
+      android_version: ${{ inputs.android_version }}
+      kernel_version: ${{ inputs.kernel_version }}
+      sublevel: ${{ inputs.sublevel }}
+      os_patch_level: ${{ inputs.os_patch_level }}
+      variant: ${{ needs.resolve.outputs.variant }}
+      feature_set: ${{ needs.resolve.outputs.feature_set }}
+      susfs_commit: ${{ inputs.susfs_commit }}
+      root_flavor: ${{ needs.resolve.outputs.root_flavor }}
+      root_commit: ${{ needs.resolve.outputs.root_commit }}
+      nomount_commit: ${{ needs.resolve.outputs.nomount_commit }}
+      build_bypass: ${{ inputs.build_bypass }}
+    secrets: inherit
