@@ -43,10 +43,10 @@ on:
         required: false
         default: false
       build_bypass:
-        description: "Build bypass kernel (uncheck to disable)"
+        description: "Build bypass kernel"
         type: boolean
         required: false
-        default: true
+        default: false
       version:
         description: "version"
         type: string
