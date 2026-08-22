@@ -18,6 +18,7 @@ inputs:
 
 runs:
   using: composite
+  using: composite
   steps:
     - name: Apply Kernel Name Branding
       shell: bash
