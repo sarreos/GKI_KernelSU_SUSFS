@@ -2,19 +2,14 @@ name: 'Apply Kernel Branding & Timestamp'
 description: 'Apply kernel branding to kernel version string'
 inputs:
   variant:
-    description: 'Variant of kernel to apply branding to'
     required: true
   kernel_version:
-    description: 'Kernel version (e.g., 6.1)'
     required: true
   android_version:
-    description: 'Android version (e.g., android14)'
     required: true
   version:
-    description: 'Combined version (e.g., android14-6.1)'
     required: true
   sublevel:
-    description: 'Sublevel of kernel version (e.g., 1)'
     required: true
   brand_name:
     description: 'Branding text appended to the version (e.g., Wild)'
@@ -22,7 +17,7 @@ inputs:
     default: Wild
 
 runs:
-  using: "composite"
+  using: composite
   steps:
     - name: Apply Kernel Name Branding
       shell: bash
