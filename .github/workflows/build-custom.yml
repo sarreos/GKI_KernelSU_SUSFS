@@ -300,5 +300,5 @@ jobs:
       root_flavor: ${{ needs.resolve.outputs.root_flavor }}
       root_commit: ${{ needs.resolve.outputs.root_commit }}
       nomount_commit: ${{ needs.resolve.outputs.nomount_commit }}
-      build_bypass: ${{ inputs.build_bypass }}
+      bypass: ${{ inputs.build_bypass }}
     secrets: inherit
