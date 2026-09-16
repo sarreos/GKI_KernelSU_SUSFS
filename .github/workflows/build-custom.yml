@@ -16,7 +16,7 @@ on:
           - KernelSU-Next
           - Classic KernelSU
           - None
-        default: ReSukiSU
+        default: None
       enable_susfs:
         description: "Enable SUSFS"
         type: boolean
