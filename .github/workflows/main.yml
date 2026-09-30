@@ -45,12 +45,12 @@ on:
           - 6.1.x-android14
           - 6.6.x-android15
           - 6.12.x-android16
-        default: All
+        default: 6.1.x-android14
       os_patch_level:
         description: "Patch date (YYYY-MM), kernel sublevel, lts, or All (no filter)"
         required: true
         type: string
-        default: All
+        default: 2026-03
       page_size:
         description: "ARM64 page size. 16k requires explicitly selecting Kernel Version 6.1.x-android14, 6.6.x-android15 or 6.12.x-android16 (All is rejected)"
         type: choice
@@ -61,11 +61,11 @@ on:
       brand_name:
         description: "Kernel Branding (empty = stock version string)"
         type: string
-        default: Wild
+        default: 
       keep_kmi:
         description: "Keep stock KMI generation suffix in kernel version (fix #265)"
         type: boolean
-        default: false
+        default: true
       commit_mode:
         description: "latest = branch tips, verified = audited pins, update = build latest then promote verified pins on success"
         required: false
@@ -86,15 +86,15 @@ on:
           - KowSU
           - No Root
           - All (KernelSU-Next + KernelSU + ReSukiSU)
-        default: All (KernelSU-Next + KernelSU + ReSukiSU)
+        default: No Root
       use_susfs:
         description: "SUSFS"
         type: boolean
-        default: true
+        default: false
       use_nomount:
         description: "NoMount"
         type: boolean
-        default: true
+        default: false
       use_bbg:
         description: "Baseband Guard"
         type: boolean
@@ -106,7 +106,7 @@ on:
       use_ds:
         description: "DroidSpaces"
         type: boolean
-        default: true
+        default: false
       use_ntsync:
         description: "NTSync"
         type: boolean
