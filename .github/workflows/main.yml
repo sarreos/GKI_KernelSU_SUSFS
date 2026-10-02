@@ -1423,9 +1423,50 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        expected=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" --paginate --jq '.artifacts[].name' | grep -c '\-AnyKernel3$')
+
+        # Page the artifact list explicitly rather than with --paginate. On a
+        # run this large --paginate has been observed to stop early (1129 of
+        # 1229 artifacts), which silently undercounts the target.
+        names=$(mktemp)
+        for page in $(seq 1 50); do
+          batch=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100&page=${page}" \
+            --jq '.artifacts[].name' || true)
+          [ -z "$batch" ] && break
+          printf '%s\n' "$batch" >> "$names"
+          count=$(printf '%s\n' "$batch" | grep -c . || true)
+          [ "$count" -lt 100 ] && break
+        done
+
+        expected=$(grep -c '\-AnyKernel3$' "$names" || true)
+
+        # download-artifact matches patterns server-side and, on a run with
+        # ~1200 artifacts, silently skipped some while still reporting success
+        # (run 36828639322: 496 of 609). Re-fetch anything it missed straight
+        # from the API so a pattern-matching miss cannot produce a short
+        # release.
+        missing=0
+        while IFS= read -r name; do
+          [ -z "$name" ] && continue
+          if [ ! -d "release-assets/${name}" ]; then
+            echo "Re-fetching missed artifact: $name"
+            if ! gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?name=${name}" \
+              --jq '.[0].archive_download_url' | xargs -r curl -fsSL -o "release-assets/${name}.zip"; then
+              echo "ERROR: failed to re-fetch $name" >&2
+              missing=$((missing + 1))
+            else
+              mkdir -p "release-assets/${name}" && unzip -q -o "release-assets/${name}.zip" -d "release-assets/${name}"
+              rm -f "release-assets/${name}.zip"
+            fi
+          fi
+        done < <(grep '\-AnyKernel3$' "$names" || true)
+        rm -f "$names"
+
         got=$(ls -d release-assets/*-AnyKernel3 2>/dev/null | wc -l)
-        echo "AnyKernel3 artifacts in run: $expected, downloaded: $got"
+        echo "AnyKernel3 artifacts in run: $expected, downloaded: $got, unrecoverable: $missing"
+        if [ "$missing" -ne 0 ]; then
+          echo "ERROR: $missing AnyKernel3 artifacts could not be downloaded" >&2
+          exit 1
+        fi
         if [ "$got" -ne "$expected" ]; then
           echo "ERROR: downloaded $got of $expected AnyKernel3 artifacts" >&2
           exit 1
