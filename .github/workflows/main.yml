@@ -383,7 +383,7 @@ jobs:
             "No Root")
               echo "root_flavor=none" >> "$GITHUB_OUTPUT"
               echo "root_commit=" >> "$GITHUB_OUTPUT"
-              ROOT_MATRIX='[{"root_flavor":"none","variant":"NoRoot","root_commit":""}]'
+              ROOT_MATRIX='[{"root_flavor":"none","variant":"NoRoot","root_commit":"","produce":true}]'
               ;;
             "All (KernelSU-Next + KernelSU + BakaSU)")
               # Fan out to all three root variants, each with its pinned commit.
