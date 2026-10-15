@@ -81,9 +81,6 @@ FAMILY_NAMES = {
     "build-android17-6-18": "6.18.x-android17",
 }
 
-MARKS = {"success": "✅", "failure": "❌", "cancelled": "⛔",
-         "skipped": "⏭️", "startup_failure": "❌"}
-
 MAX_LEN = 4000  # Telegram cap is 4096; leave headroom for entities
 RICH_MAX_LEN = 32000  # Bot API 10.x rich message cap is ~32768
 
@@ -249,7 +246,7 @@ def main() -> int:
                 e["sublevels"].append(tag)
             if flavor and flavor not in e["flavors"]:
                 e["flavors"].append(flavor)
-            sj = e["sub_jobs"].setdefault(tag, {})
+            sj = e["sub_jobs"].setdefault((tag, flavor), {})
             c = j.get("conclusion") or j.get("status") or "unknown"
             sj[c] = sj.get(c, 0) + 1
         c = j.get("conclusion") or j.get("status") or "unknown"
@@ -262,21 +259,45 @@ def main() -> int:
             if any(k != "skipped" for k in e["counts"])}
 
     icon = "🌙" if args.event == "schedule" else "🔨"
+
+    # Testing-release note (user request 2026-10-14): only a dispatch with
+    # release_type == "Release" (or a real GitHub release event) is a final
+    # build; CI / Nightly / Pre-Release / schedule builds carry a flash
+    # warning. RELEASE_TYPE arrives as env from the announce job
+    # (github.event.inputs.release_type - empty on schedule/push).
+    is_release = (args.event == "release"
+                  or os.environ.get("RELEASE_TYPE", "").strip() == "Release")
+    test_note_md = ("" if is_release else
+                    "## ⚠️ TESTING RELEASE\n"
+                    "**Back up your data before flashing!**")
+    test_note_html = ("" if is_release else
+                      "⚠️ <b>TESTING RELEASE</b> ⚠️\n"
+                      "<i>Back up your data before flashing!</i>")
     for fam, e in sorted(fams.items()):
         topic = TOPICS.get(fam, FALLBACK_TOPIC)
         fname = FAMILY_NAMES.get(fam, fam)
         esc = html.escape
 
-        counts = "  ".join(f"{MARKS.get(k, '•')} {v}"
-                           for k, v in sorted(e["counts"].items()))
+        # Kernel outcome counts (user request 2026-10-15): job totals were
+        # useless - a run with failed kernels still posted "✅ 59" style
+        # marks. Show KERNELS built vs failed instead. n_built = linked
+        # AnyKernel3 artifacts; n_failed = failed build legs (one leg is
+        # one kernel). Computed after the sub_flav loop below.
 
         # Numeric sort: sublevel then os date ("6.6.102-...-2025-10" AFTER
         # "6.6.118-...-2026-01"? No - 118 > 102, and 2026 > 2025). Lexicographic
-        # puts 6.6.102 before 6.6.30 - wrong. X (lts) sorts last.
+        # puts 6.6.102 before 6.6.30 - wrong. The lts tag sorts LAST. Note the
+        # lts tag shape is "6.12.X-android16-lts": parts[2] is "lts", NOT "X"
+        # (the X lives in the version part), so key the lts detection off any
+        # segment / the .X version marker - the old parts[2]=="X" check never
+        # matched a real tag and lts sorted FIRST (run 38605980161 posted
+        # 6.12.X-android16-lts above 6.12.23).
         def sub_key(tag: str):
             parts = tag.split("-")
             sub = parts[2] if len(parts) >= 3 else "0"
-            sub_num = 10 ** 9 if sub.upper() == "X" else \
+            is_lts = (sub.upper() == "X" or ".X" in parts[0]
+                      or any(p.lower() == "lts" for p in parts))
+            sub_num = 10 ** 9 if is_lts else \
                 int("".join(ch for ch in sub if ch.isdigit()) or 0)
             date_num = 0
             for p in parts[3:]:
@@ -318,24 +339,36 @@ def main() -> int:
                         sub_flav[(s, f)] = f"{art_base}/actions/artifacts/{a['id']}.zip"
                         break
 
-        # Per-sublevel lines: every built flavor links separately.
+        # Per-kernel lines, VERTICAL (user request 2026-10-15): one line
+        # per (version, flavor) kernel, the whole line one link, so mobile
+        # never wraps mid-name (the old "version — flavor · flavor" lines
+        # broke as "…KernelSU" / "-Next · BakaSU" on the next line).
+        # Failed/cancelled legs get their own ❌ line - every kernel the
+        # run attempted is accounted for.
         sub_lines = []
         rich_subs_list = []
         for s in subs:
-            links = [(f, sub_flav[(s, f)]) for f in flav_order
-                     if (s, f) in sub_flav]
-            if links:
-                h = "  ·  ".join(
-                    f"<a href=\"{html.escape(u, quote=True)}\">{esc(f)}</a>"
-                    for f, u in links)
-                sub_lines.append(f"- {esc(s)} — {h}")
-                r = " · ".join(f"[{f}]({u})" for f, u in links)
-                rich_subs_list.append(f"- {esc(s)} — {r}")
-            else:
-                sub_lines.append(f"- ❌ {esc(s)}")
-                rich_subs_list.append(f"- ❌ {esc(s)}")
+            for f in flav_order:
+                label = f"{s} — {f}"
+                u = sub_flav.get((s, f))
+                if u:
+                    h = f"<a href=\"{html.escape(u, quote=True)}\">" \
+                        f"{esc(label)}</a>"
+                    sub_lines.append(h)
+                    # Rich variant: <a> anchors, NOT [md](url) links - see
+                    # the expandable-quote note below.
+                    rich_subs_list.append(h)
+                elif any(k not in ("success", "skipped")
+                         for k in e["sub_jobs"].get((s, f), {})):
+                    sub_lines.append(f"❌ {esc(label)}")
+                    rich_subs_list.append(f"❌ {esc(label)}")
         sub_text = "\n".join(sub_lines) if sub_lines else "—"
-        rich_subs = "\n".join(rich_subs_list) if rich_subs_list else "—"
+
+        n_built = len(sub_flav)
+        n_failed = (e["counts"].get("failure", 0)
+                    + e["counts"].get("startup_failure", 0))
+        counts = (f"{n_built} built / {n_failed} failed" if n_failed
+                  else f"{n_built} built")
 
         # Family gate: zero linked kernels means nothing built for this
         # family (every sublevel failed) - skip the card entirely instead
@@ -346,29 +379,21 @@ def main() -> int:
                   f"(no kernels built); skipping card", file=sys.stderr)
             continue
 
-        # Flavors, each linking its manager APK when the run uploaded one.
-        # The flavor name links the stock manager; KernelSU-Next gets a
-        # trailing "spoofed" link for its second variant.
+        # Root section (user request 2026-10-15): one manager APK per line,
+        # vertical - spoofed variants get their OWN line labeled
+        # "<flavor> (spoofed)" instead of a trailing " · spoofed" that
+        # wraps badly on mobile. Each whole line is the link.
         flines = []
-        rich_fl = []
         for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
             if not links:
                 flines.append(esc(f))
-                rich_fl.append(esc(f))
                 continue
-            line = f"<a href=\"{html.escape(links[0], quote=True)}\">" \
-                   f"{esc(f)}</a>"
-            rf = f"[{esc(f)}]({links[0]})"
-            if len(links) > 1:
-                line += "  ·  " + "  ·  ".join(
-                    f"<a href=\"{html.escape(u, quote=True)}\">spoofed</a>"
-                    for u in links[1:])
-                rf += " · " + " · ".join(f"[spoofed]({u})" for u in links[1:])
-            flines.append(line)
-            rich_fl.append(rf)
+            for i, u in enumerate(links):
+                label = esc(f) if i == 0 else f"{esc(f)} (spoofed)"
+                flines.append(
+                    f"<a href=\"{html.escape(u, quote=True)}\">{label}</a>")
         flavors = "\n".join(flines) if flines else "—"
-        rich_flavors = "\n".join(rich_fl) if rich_fl else "—"
 
         # Root + Features + SUSFS commit info, mirroring the release notes
         # (main.yml notes-preview job). The root comes from the job names;
@@ -453,34 +478,15 @@ def main() -> int:
         feat_rich = "\n".join(rlines2)
 
         # Buttons (URL only - no backend needed), one source for both the
-        # JSON inline keyboard (cloud fallback) and the rich card:
-        #   - one download button per BUILT kernel, full kernel string as
-        #     the label (6.1.157-android14-2025-12); sublevels built by
-        #     MULTIPLE flavors get one button per flavor (suffixed), on
-        #     their own row. Single-flavor sublevels pack 2 per row.
-        #   - manager APK buttons, one row per flavor (name + spoofed)
-        #   - all-artifacts row
-        btn_rows = []  # list of rows; each row = list[(text, url)]
-        pool = []
-        for s in reversed(subs):
-            ls = [(f, sub_flav[(s, f)]) for f in flav_order
-                  if (s, f) in sub_flav]
-            if not ls:
-                continue
-            if len(ls) == 1:
-                pool.append((f"⬇️ {s}", ls[0][1]))
-                if len(pool) == 2:
-                    btn_rows.append(pool)
-                    pool = []
-            else:
-                if pool:
-                    btn_rows.append(pool)
-                    pool = []
-                for f, u in ls:  # one button per row: full string + flavor
-                    btn_rows.append([(f"⬇️ {s} · {f}", u)])
-        if pool:
-            btn_rows.append(pool)
-        mgr_rows = []
+        # JSON inline keyboard (cloud fallback) and the rich card.
+        # 2026-10-14: the per-kernel download buttons are GONE - big
+        # families (40+ sublevels x flavors) blew past Telegram's
+        # 100-button inline-keyboard cap and posts got cut off before
+        # everything linked. Every kernel link now lives as a TEXT link
+        # in the expandable Sublevels quote; the only buttons are the
+        # manager APKs (one row per flavor, spoofed riding along) and
+        # the all-artifacts row.
+        mgr_rows = []  # list of rows; each row = list[(text, url)]
         for f in ordered_manager_flavors(e["flavors"]):
             links = manager_links(f)
             if not links:
@@ -489,8 +495,7 @@ def main() -> int:
             row += [("spoofed", u) for u in links[1:]]
             mgr_rows.append(row)
 
-        kb_rows = [[{"text": t, "url": u} for t, u in row]
-                   for row in btn_rows + mgr_rows]
+        kb_rows = [[{"text": t, "url": u} for t, u in row] for row in mgr_rows]
         kb_rows.append([{"text": "📦 All artifacts", "url": args.nightly_url}])
         buttons = json.dumps({"inline_keyboard": kb_rows},
                              separators=(",", ":"), ensure_ascii=False)
@@ -503,10 +508,14 @@ def main() -> int:
         # table cells; table cells carry plain text only. No credit footer
         # in the message (attribution lives in this header).
         rich_parts = [f"# {icon} Wild Kernels"]
+        if test_note_md:
+            # Prominent (user request 2026-10-15): heading-size banner
+            # right under the title, BEFORE the table - not a small line
+            # buried after it.
+            rich_parts.append(test_note_md)
         trows = [
             ("Branch", esc(args.branch)),
-            ("Trigger", esc(args.event)),
-            ("Jobs", esc(counts)),
+            ("Kernels", counts),
         ]
         tbody = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in trows)
         rich_parts.append(
@@ -517,49 +526,92 @@ def main() -> int:
             rich_parts.append(roots_rich)
         if feat_text:
             rich_parts.append(f"**Features**\n{feat_rich}")
-        # No Sublevels/Flavors sections here: the button rows below carry
-        # the same info (one download button per kernel, manager buttons
-        # per flavor) - the user asked for the leaner card.
-        # Buttons: per-kernel downloads (success; multi-flavor sublevels
-        # get flavor-suffixed rows), managers (primary).
-        for row in btn_rows:
-            cells = "".join(
-                f'<tg-button type="url" style="success" url="{u}">{t}</tg-button>'
-                for t, u in row)
-            rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
+        # Sublevels as TEXT LINKS in an expandable quote: carries every
+        # kernel link without the button wall, and collapses by default
+        # so the card stays clean. INSIDE the quote use ONLY
+        # Dragonw1nd-proven constructs: plain text, <a href> anchors and
+        # <br> line breaks. Markdown ( **bold**, [md](url), \n-separated
+        # lists) is NOT proven inside blockquotes - Dragonw1nd never puts
+        # it there - and raw \n does not reliably break lines inside a
+        # quote, hence <br> (their "Build completed ...<br>Build started"
+        # pattern). First post of the old md-in-quote form (run 38605980161)
+        # showed raw markup instead of links.
+        if rich_subs_list:
+            qbody = "<br>".join(rich_subs_list)
+            rich_parts.append(
+                f"<blockquote expandable>Kernels ({len(rich_subs_list)})"
+                f"<br>{qbody}</blockquote>")
+        # Manager APK buttons (primary) + the all-artifacts escape hatch.
+        # Per-kernel download buttons were removed 2026-10-14 - see the
+        # keyboard section above for why.
         for row in mgr_rows:
             cells = "".join(
                 f'<tg-button type="url" style="primary" url="{u}">{t}</tg-button>'
                 for t, u in row)
             rich_parts.append(f"<tg-button-row>{cells}</tg-button-row>")
+        rich_parts.append(
+            f'<tg-button-row><tg-button type="url" style="primary" '
+            f'url="{args.nightly_url}">📦 All artifacts</tg-button>'
+            f"</tg-button-row>")
         rich = "\n\n".join(rich_parts)
         if len(rich) > RICH_MAX_LEN:
             rich = rich[:RICH_MAX_LEN - 1] + "…"
 
         root_block = f"{root_line}\n\n" if root_line else ""
         feat_block = f"<b>Features</b>:\n{feat_text}\n\n" if feat_text else ""
-        msg = (
-            f"<b>{icon} Wild Kernels</b>\n"
-            f"\n"
-            f"<b>{esc(fname)}</b>\n"
-            f"\n"
-            f"<b>Branch</b>: <code>{esc(args.branch)}</code>\n"
-            f"<b>Trigger</b>: {esc(args.event)}\n"
-            f"<b>Run</b>: <a href=\"{esc(args.run_url)}\">#{args.run_id}</a>\n"
-            f"\n"
-            f"{root_block}"
-            f"{feat_block}"
-            f"<b>Sublevels</b>:\n"
-            f"{sub_text}\n"
-            f"\n"
-            f"<b>Flavors</b>:\n"
-            f"{flavors}\n"
-            f"\n"
-            f"<b>Jobs</b>: {counts}\n"
-            f"\n"
-            f"<b>Download</b>:\n"
-            f"<a href=\"{esc(args.nightly_url)}\">nightly.link — all artifacts</a>"
-        )
+        warn_block = f"{test_note_html}\n\n" if test_note_html else ""
+
+        def build_html_card(sub_body: str) -> str:
+            # Vertical mobile-first layout (user request 2026-10-15):
+            # warning banner up top, compact meta line (Branch · Run),
+            # kernel count, then Kernel list, a separator rule, and the
+            # Root (manager) list - no side-by-side "·" runs that wrap.
+            return (
+                f"<b>{icon} Wild Kernels</b>\n"
+                f"\n"
+                f"<b>{esc(fname)}</b>\n"
+                f"\n"
+                f"{warn_block}"
+                f"<b>Branch</b>: <code>{esc(args.branch)}</code> · "
+                f"<b>Run</b>: <a href=\"{esc(args.run_url)}\">#{args.run_id}</a>\n"
+                f"<b>Kernels</b>: {counts}\n"
+                f"\n"
+                f"{root_block}"
+                f"{feat_block}"
+                f"<b>Kernel</b>:\n"
+                f"{sub_body}\n"
+                f"\n"
+                f"{'─' * 14}\n"
+                f"\n"
+                f"<b>Root</b>:\n"
+                f"{flavors}\n"
+                f"\n"
+                f"<b>Download</b>:\n"
+                f"<a href=\"{esc(args.nightly_url)}\">nightly.link — all artifacts</a>"
+            )
+
+        msg = build_html_card(sub_text)
+        # Big families (6.6: 40+ sublevels x flavors) overflow the cloud
+        # 4096 cap mid-list, even mid-URL - the bore-branch fallback card
+        # for 38605980161 ended in a broken half-link with the Flavors /
+        # Jobs / Download sections gone. Shrink the LIST, not the card:
+        # drop whole trailing sublevel lines, note the dropped count, keep
+        # every later section intact. Only a card that is too long with an
+        # empty list falls through to the hard cut.
+        if len(msg) > MAX_LEN and len(sub_lines) > 1:
+            shrunk = None
+            for keep in range(len(sub_lines) - 1, 0, -1):
+                dropped = len(sub_lines) - keep
+                body = "\n".join(sub_lines[:keep]) + \
+                    f"\n… +{dropped} more — see All artifacts below"
+                cand = build_html_card(body)
+                if len(cand) <= MAX_LEN:
+                    shrunk = cand
+                    break
+            if shrunk is None:
+                shrunk = build_html_card(
+                    f"… +{len(sub_lines)} builds — see All artifacts below")
+            msg = shrunk
         if len(msg) > MAX_LEN:
             msg = msg[:MAX_LEN - 1] + "…"
         # Records: CHAT \t TOPIC \t FAMILY \t RICH_MD \t HTML \t BUTTONS_JSON,
