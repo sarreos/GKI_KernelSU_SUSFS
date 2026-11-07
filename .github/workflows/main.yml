@@ -48,7 +48,7 @@ on:
       brand_name:
         description: "Kernel Branding (empty = stock version string)"
         type: string
-        default: 666
+        default:
       keep_kmi:
         description: "Keep stock KMI generation suffix in kernel version (fix #265)"
         type: boolean
